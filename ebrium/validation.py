@@ -24,20 +24,11 @@ detect_uniwidth_family = planning.detect_uniwidth_family
 
 
 def validate_args(args: argparse.Namespace) -> None:
-    if getattr(args, "probe_variation_metrics", False):
-        irrelevant = []
-        if getattr(args, "line_box", "auto") != "auto":
-            irrelevant.append(f"--line-box {args.line_box}")
-        if getattr(args, "force_baseline_from", None):
-            irrelevant.append("--line-box-from")
-        if args.dry_run:
-            irrelevant.append("--dry-run")
-        if args.report:
-            irrelevant.append("--report")
-        if irrelevant:
-            cs.StatusIndicator("info").add_message(
-                f"--probe-variation-metrics only inspects tables; ignoring: {', '.join(irrelevant)}"
-            ).emit(console)
+    # Note: this is never called for `ebrium probe` (cli.py returns before
+    # reaching it), and each subcommand's parser only defines the flags that
+    # do something for it - e.g. --exclude/--combine/--line-box don't exist
+    # under `individual`, so there's nothing to warn about "having no effect"
+    # there anymore; using them is a normal argparse usage error instead.
 
     # Validate letter-height (percentage input)
     if args.letter_height <= 50 or args.letter_height > 200:
@@ -63,13 +54,6 @@ def validate_args(args: argparse.Namespace) -> None:
             f"≈ {estimated_span}% of UPM - extremely loose spacing"
         ).emit(console)
 
-    # Warn if modifiers used with wrong mode
-    if args.grouping_mode != "superfamily":
-        if getattr(args, "exclude", None):
-            cs.StatusIndicator("warning").add_message(
-                "--exclude only applies to --grouping superfamily (ignored)"
-            ).emit(console)
-
     # Report prefix normalization when active
     if getattr(args, "ignore_prefix", None):
         cs.StatusIndicator("info").add_message(
@@ -79,9 +63,9 @@ def validate_args(args: argparse.Namespace) -> None:
             indent_level=1,
         ).emit(console)
 
-    # Note: --line-box-main-cluster is a --line-box choice now
-    # (force-baseline-main-cluster), so it can no longer be set without
-    # force-baseline also being true - no "has no effect unless" case exists.
+    # Note: force-baseline-main-cluster is a --line-box choice, so it can no
+    # longer be set without force-baseline also being true - no "has no
+    # effect unless" case exists.
 
     _fb_from = getattr(args, "force_baseline_from", None)
     _fb_from = (_fb_from or "").strip() if _fb_from else ""
@@ -99,28 +83,14 @@ def validate_args(args: argparse.Namespace) -> None:
                 "With --line-box-from, reference selection ignores "
                 "--line-box force-baseline-main-cluster"
             ).emit(console)
-        if args.grouping_mode == "individual":
-            cs.StatusIndicator("warning").add_message(
-                "--line-box force-baseline has no effect with --grouping individual "
-                "(single-font families)"
-            ).emit(console)
         # Note: --line-box force-baseline and --line-box safe-hhea can no longer both
         # be set (they're choices of the same flag), so no precedence warning is needed.
-
-    if args.grouping_mode == "individual":
-        if (
-            getattr(args, "combine", None)
-            or getattr(args, "ignore_prefix", None)
-            or getattr(args, "exclude", None)
-        ):
-            cs.StatusIndicator("warning").add_message(
-                "--grouping individual ignores all grouping modifiers "
-                "(--combine, --ignore-prefix, --exclude)"
-            ).emit(console)
+        # Note: --line-box doesn't exist under `individual`, so there's no
+        # "has no effect with individual" case to warn about anymore.
 
     if args.grouping_mode == "conservative":
         cs.StatusIndicator("info").add_message(
-            "family-safe-max mode: using bbox extremes for all fonts (no clustering, prevents clipping)"
+            "--safe-max: using bbox extremes for all fonts (no clustering, prevents clipping)"
         ).emit(console)
 
     # Report pattern overrides
@@ -378,7 +348,7 @@ def generate_family_report(
             cs.StatusIndicator("warning").add_message(
                 f"⚠️  High normalization impact detected ({max_pull:.1f}% max adjustment)"
             ).add_item(
-                "Consider using --grouping individual for heavily affected fonts", indent_level=1
+                "Consider the individual subcommand for heavily affected fonts", indent_level=1
             ).add_item(
                 f"Or use --max-adjustment {max_pull * 0.8:.1f} to limit adjustment",
                 indent_level=1,

@@ -61,13 +61,8 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     start_time = time.time()
     args = parse_args()
-    validate_args(args)
 
-    # --report implies --dry-run
-    if args.report:
-        args.dry_run = True
-
-    if getattr(args, "probe_variation_metrics", False):
+    if args.mode == "probe":
         files_probe = scan_fonts(args.paths or ["."], args.recursive, args.use_ttx)
         if not files_probe:
             cs.StatusIndicator("error").add_message("No font files found").emit(console)
@@ -81,6 +76,12 @@ def main() -> None:
             console=console,
         )
         sys.exit(0)
+
+    validate_args(args)
+
+    # --report implies --dry-run
+    if args.report:
+        args.dry_run = True
 
     # Convert percentage inputs to internal fraction representation
     config = MetricsConfig(

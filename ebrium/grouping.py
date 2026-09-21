@@ -67,7 +67,7 @@ def group_families(args, measures, forced_groups):
         groups = sorter.group_by_family(forced_groups=forced_groups)
 
         cs.StatusIndicator("info").add_message(
-            f"Found {cs.fmt_count(len(groups))} family group(s) (family-safe-max mode, no clustering)"
+            f"Found {cs.fmt_count(len(groups))} family group(s) (--safe-max, no clustering)"
         ).emit(console)
 
         if forced_groups:

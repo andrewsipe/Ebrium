@@ -47,7 +47,11 @@ def _heading(title: str, note: str = "") -> Text:
 def _grid() -> Table:
     grid = Table.grid(padding=(0, 2))
     grid.add_column(no_wrap=True)
-    grid.add_column()
+    # overflow="fold": Rich's Column default is "ellipsis", which silently
+    # drops text when a single long word (e.g. "force-baseline)") doesn't fit
+    # the wrapped column width. "fold" hard-breaks it onto another line
+    # instead of losing characters.
+    grid.add_column(overflow="fold")
     return grid
 
 
@@ -133,7 +137,7 @@ def notes_section(items: Iterable[str], title: str = "notes") -> RenderableType:
     Bullets wrap with a hanging indent."""
     grid = Table.grid(padding=(0, 1))
     grid.add_column(no_wrap=True)
-    grid.add_column()
+    grid.add_column(overflow="fold")
     for item in items:
         grid.add_row(Text("•", style=HEADING), _flagged(item))
     return _section(title, grid)
@@ -187,6 +191,8 @@ class RichHelp(argparse.Action):
 
     def __call__(self, parser, namespace, values, option_string=None):
         console = self._console or Console()
+        # panel=None (default) -> the default safety_panel(); panel=False ->
+        # no panel at all (e.g. a read-only subcommand with nothing to warn about).
         panel = self._panel if self._panel is not None else safety_panel()
         text = parser.format_help()
 
@@ -205,9 +211,10 @@ class RichHelp(argparse.Action):
         if head:
             console.out(head, highlight=False, end="")
             console.print()
-            console.print(panel)
-            console.print()
-        else:
+            if panel:
+                console.print(panel)
+                console.print()
+        elif panel:
             console.print(panel)
             console.print()
 

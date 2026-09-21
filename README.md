@@ -1,6 +1,6 @@
 # ebrium
 
-**Version 2.1.0**
+**Version 3.0.0**
 
 Normalize vertical metrics across a font family without changing unitsPerEm or glyph outlines.
 
@@ -34,43 +34,73 @@ cd ebrium && pip install .
 Then:
 
 ```bash
-ebrium /path/to/fonts -r
+ebrium family /path/to/fonts -r
 # or
-python -m ebrium /path/to/fonts -r
+python -m ebrium family /path/to/fonts -r
 ```
 
 ## Usage
 
+`ebrium` is subcommand-first: you pick how fonts are grouped, and that
+choice determines which other flags apply. There's no default subcommand —
+picking one is the point, not an afterthought.
+
 ```bash
-# Normalize a directory (recursive)
-ebrium /path/to/fonts -r
+# Group by family name, cluster within each family (most common case)
+ebrium family /path/to/fonts -r
 
 # Preview without writing
-ebrium /path/to/fonts -r -n
+ebrium family /path/to/fonts -r -n
 
 # Skip confirmation
-ebrium /path/to/fonts -r -y
+ebrium family /path/to/fonts -r -y
 
 # Detailed impact report (implies dry-run)
-ebrium /path/to/fonts -r --report
+ebrium family /path/to/fonts -r --report
+
+# Normalize each font on its own, no grouping at all
+ebrium individual /path/to/fonts -r
+
+# Merge families that share a name prefix
+ebrium superfamily /path/to/fonts -r
+
+# Read-only MVAR/HVAR coverage report; no grouping, measuring, or writing
+ebrium probe /path/to/fonts -r
 ```
 
-## Command-line options
+Full flag reference for any subcommand: `ebrium <subcommand> --help`.
 
-### Basics
+## Subcommands
 
-| Flag | Meaning |
-|------|---------|
-| `paths` | Font files or directories (default: current directory) |
-| `-r, --recursive` | Recurse into directories |
-| `-n, --dry-run` | Preview without writing |
-| `-y, --yes` | Skip confirmation |
-| `-v / -vv` | Verbose / debug |
-| `--use-ttx` | Include `.ttx` files |
-| `--report` | Family vs per-font analysis (implies dry-run) |
-| `--probe-variation-metrics` | Read-only MVAR/HVAR probe (no measure/write) |
+Earlier versions put every flag at the top level and warned at runtime when
+one didn't apply to the mode you'd chosen (`--exclude` only works with
+superfamily, `--line-box` does nothing under individual, and so on). That
+information already existed as branches in the code — `grouping.py` and
+`planning.py` both switch on the grouping strategy as their first decision.
+The parser now matches that shape: each subcommand only defines the flags
+that do something for it, so an invalid combination
+(`ebrium individual fonts/ --exclude X`) is an ordinary argparse error
+instead of a warning you might not notice.
 
-### Vertical spacing (% of UPM)
+| Subcommand | What it does | Flags beyond input/preview/spacing/detection |
+|---|---|---|
+| `individual` | Normalize each font on its own; no grouping, no clustering | *(none — see below)* |
+| `family` | Group by family name, cluster within each family | `--safe-max`, `--combine`, `--ignore-prefix`, `--line-box*`, `--report` |
+| `superfamily` | Merge families sharing a name prefix, cluster across the merge | `--combine`, `--ignore-prefix`, `--exclude`, `--line-box*`, `--report` |
+| `probe` | Read-only MVAR/HVAR coverage report | *(none — just input + `-v`)* |
+
+`probe` used to be a `--probe-variation-metrics` flag. It never touched
+grouping, measurement, or config — `variation_probe.py` is fully
+self-contained — so it was always a separate tool wearing a flag; it's a
+subcommand now because that's what it actually is.
+
+### Shared across `individual` / `family` / `superfamily`
+
+**Input:** `paths` (font files or directories; default: current directory), `-r, --recursive`, `--use-ttx`
+
+**Preview and confirmation:** `-n, --dry-run`, `-y, --yes` (`probe` has neither — it never writes and never prompts)
+
+**Vertical spacing (% of UPM):**
 
 | Flag | Meaning |
 |------|---------|
@@ -79,36 +109,36 @@ ebrium /path/to/fonts -r --report
 | `--max-adjustment PERCENT` | Cap how far family extremes may pull a font |
 | `--no-auto-adjust` | Use exact `--letter-height` (no x-height tweak) |
 
-### Grouping mode
+**Detection overrides (glob patterns, repeatable):** `--assume-script`, `--assume-decorative`, `--assume-unicase`, `--assume-uniwidth`, `--exclude-measuring`
 
-One flag, four choices — `--safe-max` was never a fifth independent mode; it's
-always plain family grouping with clustering turned off, so it reads as a
-variant of `--grouping family`.
+**General:** `-h, --help`, `--version`, `-v / -vv`
 
-| `--grouping MODE` | Meaning |
-|------|---------|
-| `family` | Group by family name, cluster within families (**default**) |
-| `family-safe-max` | Group by family; bbox extremes for every font, no clustering (prevents clipping) |
-| `superfamily` | Merge shared-prefix families, cluster across the superfamily |
-| `individual` | Normalize each font alone (no grouping/clustering) |
-
-### Grouping modifiers
+### `family` only
 
 | Flag | Meaning |
 |------|---------|
-| `--combine "A,B"` | Force-merge families (repeatable) |
-| `--ignore-prefix TOKEN` | Ignore token when normalizing names (repeatable) |
-| `--exclude NAME` | Keep family out of superfamily merges (`--grouping superfamily` only, repeatable) |
+| `--safe-max` | bbox extremes for every font in the family instead of clustering (prevents clipping) |
 
-### Line box (typo / hhea)
+### `family` and `superfamily`
 
-One flag, four choices — `--force-baseline`, `--safe-hhea` and
-`--force-baseline-main-cluster` used to be three separate flags, but
-`--safe-hhea` always silently overrode `--force-baseline` at runtime, and
-`--force-baseline-main-cluster` never meant anything on its own (it only
-ever narrowed which font `--force-baseline` picks as its reference — the
-same relationship `--safe-max` has to `--grouping family`). So they're now
-one choice flag instead of three flags that can't be freely combined.
+**Grouping modifiers (repeatable):**
+
+| Flag | Meaning |
+|------|---------|
+| `--combine "A,B"` | Force-merge families |
+| `--ignore-prefix TOKEN` | Ignore a leading token when matching family names |
+| `--exclude FAMILY` | Keep a family out of the merge (**`superfamily` only**) |
+
+**Report:** `--report` — family vs per-font analysis (implies `--dry-run`)
+
+**Line box (typo / hhea):** one flag, four choices — `--force-baseline`,
+`--safe-hhea` and `--force-baseline-main-cluster` used to be three separate
+flags, but `--safe-hhea` always silently overrode `--force-baseline` at
+runtime, and `--force-baseline-main-cluster` never meant anything on its own
+(it only ever narrowed which font `--force-baseline` picks as its
+reference). So they're one choice flag instead of three that can't be
+freely combined, and it doesn't exist under `individual` at all (single-font
+"families" have nothing to unify).
 
 | `--line-box MODE` | Meaning |
 |------|---------|
@@ -120,10 +150,6 @@ one choice flag instead of three flags that can't be freely combined.
 | Modifier | Meaning |
 |------|---------|
 | `--line-box-from PATH_OR_GLOB` | Pin the reference font (path, filename, or filename glob); implies `--line-box force-baseline` if `--line-box` is left at its default |
-
-### Detection overrides (glob patterns, repeatable)
-
-`--assume-script`, `--assume-decorative`, `--assume-unicase`, `--assume-uniwidth`, `--exclude-measuring`
 
 ## How it works
 

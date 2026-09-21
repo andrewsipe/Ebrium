@@ -1,5 +1,44 @@
 # Changelog
 
+## [3.0.0] - 2026-09-21
+
+### Changed (breaking)
+- Replaced the flat flag surface with required subcommands:
+  `ebrium {individual,family,superfamily,probe} [options] [PATH ...]`.
+  There's no default subcommand — `ebrium fonts/ -r` (implicit `family`)
+  no longer works; use `ebrium family fonts/ -r`.
+- `--grouping {family, family-safe-max, superfamily, individual}` is gone.
+  `family`/`superfamily`/`individual` are now subcommand names;
+  `family-safe-max` is `--safe-max`, a plain boolean scoped to the
+  `family` subcommand.
+- `--probe-variation-metrics` is gone; use the `probe` subcommand
+  (`ebrium probe fonts/ -r`). It never touched grouping, measurement, or
+  config, so it was always a separate tool wearing a flag.
+- `--exclude` only exists under `superfamily` now (previously accepted
+  everywhere with a runtime warning that it "only applies to
+  `--grouping superfamily`").
+- `--combine`, `--ignore-prefix`, `--line-box`, `--line-box-from`, and
+  `--report` only exist under `family`/`superfamily`. Using them under
+  `individual` or `probe` is now an "unrecognized arguments" error instead
+  of a silent no-op with a runtime warning.
+- All parsers set `allow_abbrev=False`. Previously, `--exclude` typed under
+  `individual` silently prefix-matched `--exclude-measuring` (the only
+  flag there starting with `--exclude`) instead of erroring, since
+  argparse's default abbreviation matching doesn't check whether the two
+  flags mean the same thing.
+
+### Fixed
+- `--help` sections built from `FontCore.core_cli_help`'s shared grid
+  (examples, notes) could silently drop text: Rich's default column
+  `overflow="ellipsis"` truncated an over-long final word instead of
+  wrapping it (e.g. `--line-box-from`'s help used to end
+  "...--line-box force-baselin…" with `e)` dropped). Grids now use
+  `overflow="fold"`.
+
+### Added
+- `RichHelp`'s `panel` parameter accepts `False` to omit the safety panel
+  entirely; used by `probe`, which never writes anything.
+
 ## [2.1.0] - 2026-09-21
 
 ### Changed (breaking)
