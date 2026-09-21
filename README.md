@@ -1,6 +1,6 @@
 # ebrium
 
-**Version 2.0.0**
+**Version 2.1.0**
 
 Normalize vertical metrics across a font family without changing unitsPerEm or glyph outlines.
 
@@ -102,21 +102,24 @@ variant of `--grouping family`.
 
 ### Line box (typo / hhea)
 
-One flag, three choices — `--force-baseline` and `--safe-hhea` used to be
-independent booleans, but `--safe-hhea` always silently overrode
-`--force-baseline` at runtime, so they're now one choice instead of two
-flags that can't actually be combined.
+One flag, four choices — `--force-baseline`, `--safe-hhea` and
+`--force-baseline-main-cluster` used to be three separate flags, but
+`--safe-hhea` always silently overrode `--force-baseline` at runtime, and
+`--force-baseline-main-cluster` never meant anything on its own (it only
+ever narrowed which font `--force-baseline` picks as its reference — the
+same relationship `--safe-max` has to `--grouping family`). So they're now
+one choice flag instead of three flags that can't be freely combined.
 
 | `--line-box MODE` | Meaning |
 |------|---------|
 | `auto` | Each font keeps its own planned typo/hhea values (**default**) |
 | `force-baseline` | Unify typo/hhea across the family using its largest-span style |
+| `force-baseline-main-cluster` | Like `force-baseline`, but the reference comes only from the largest optical cluster |
 | `safe-hhea` | Average existing typo/hhea across the family and apply uniformly |
 
 | Modifier | Meaning |
 |------|---------|
-| `--line-box-main-cluster` | With `--line-box force-baseline`, pick reference from largest optical cluster only |
-| `--line-box-from PATH_OR_GLOB` | With `--line-box force-baseline`, pin the reference font |
+| `--line-box-from PATH_OR_GLOB` | Pin the reference font (path, filename, or filename glob); implies `--line-box force-baseline` if `--line-box` is left at its default |
 
 ### Detection overrides (glob patterns, repeatable)
 

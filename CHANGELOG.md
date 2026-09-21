@@ -1,5 +1,23 @@
 # Changelog
 
+## [2.1.0] - 2026-09-21
+
+### Changed (breaking)
+- Folded `--force-baseline-main-cluster` into `--line-box` as a fourth
+  choice, `force-baseline-main-cluster`. It never had a value of its own —
+  it only ever narrowed which font `--force-baseline` uses as a reference
+  — so it reads better as a mode than a sibling flag (same reasoning as
+  folding `--safe-max` into `--grouping` in 2.0.0)
+- `--line-box-from PATH_OR_GLOB` now implies `--line-box force-baseline`
+  when `--line-box` is left at its default (`auto`), instead of silently
+  doing nothing until both flags were passed together
+
+### Added
+- `--help` now prints the `--grouping modes` and `--line-box modes` tables
+  immediately after their own argument group instead of only at the very
+  end, via a new `inline` hook on `RichHelp` and a per-group
+  `HelpFormatter` pass in `FontCore.core_cli_help`
+
 ## [2.0.0] - 2026-09-21
 
 ### Changed (breaking)

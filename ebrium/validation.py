@@ -28,8 +28,6 @@ def validate_args(args: argparse.Namespace) -> None:
         irrelevant = []
         if getattr(args, "line_box", "auto") != "auto":
             irrelevant.append(f"--line-box {args.line_box}")
-        if getattr(args, "force_baseline_main_cluster", False):
-            irrelevant.append("--line-box-main-cluster")
         if getattr(args, "force_baseline_from", None):
             irrelevant.append("--line-box-from")
         if args.dry_run:
@@ -81,24 +79,25 @@ def validate_args(args: argparse.Namespace) -> None:
             indent_level=1,
         ).emit(console)
 
-    if getattr(args, "force_baseline_main_cluster", False) and not getattr(
-        args, "force_baseline", False
-    ):
-        cs.StatusIndicator("warning").add_message(
-            "--line-box-main-cluster has no effect unless --line-box force-baseline"
-        ).emit(console)
+    # Note: --line-box-main-cluster is a --line-box choice now
+    # (force-baseline-main-cluster), so it can no longer be set without
+    # force-baseline also being true - no "has no effect unless" case exists.
 
     _fb_from = getattr(args, "force_baseline_from", None)
     _fb_from = (_fb_from or "").strip() if _fb_from else ""
     if _fb_from and not getattr(args, "force_baseline", False):
+        # Only reachable when --line-box was explicitly set to safe-hhea;
+        # finalize_args() already promotes the "left at auto" case to
+        # force-baseline, so --line-box-from alone always takes effect.
         cs.StatusIndicator("warning").add_message(
-            "--line-box-from has no effect unless --line-box force-baseline"
+            "--line-box-from has no effect with --line-box safe-hhea"
         ).emit(console)
 
     if getattr(args, "force_baseline", False):
         if _fb_from and getattr(args, "force_baseline_main_cluster", False):
             cs.StatusIndicator("info").add_message(
-                "With --line-box-from, reference selection ignores --line-box-main-cluster"
+                "With --line-box-from, reference selection ignores "
+                "--line-box force-baseline-main-cluster"
             ).emit(console)
         if args.grouping_mode == "individual":
             cs.StatusIndicator("warning").add_message(

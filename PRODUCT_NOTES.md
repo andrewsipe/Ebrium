@@ -12,6 +12,16 @@ FontCore is vendored (console + collector + sorter + CLI help); no submodule.
 - Standalone installable package with GitHub install paths
 - Vendored FontCore subset
 - FontFixer-style `--help` (`FontCore.core_cli_help` + `ebrium.cli_parser`)
+- `--help` gained inline mode tables (v2.1.0): `choices_section()` results
+  now print immediately after the argument group they explain (via a
+  fresh `HelpFormatter` per group + `RichHelp`'s new `inline` hook),
+  instead of only at the very end with everything else in `footer`
+- Folded `--force-baseline-main-cluster` into `--line-box` as the
+  `force-baseline-main-cluster` choice (v2.1.0, breaking) — it never had a
+  value of its own, same reasoning as folding `--safe-max` into
+  `--grouping`. `--line-box-from` stays a value-taking flag but now
+  implies `--line-box force-baseline` when `--line-box` is left at
+  `auto`, instead of doing nothing until both flags are given.
 - Consolidated argument surface (v2.0.0, breaking):
   - `--family`/`--superfamily`/`--individual`/`--safe-max` → single
     `--grouping {family, family-safe-max, superfamily, individual}`.

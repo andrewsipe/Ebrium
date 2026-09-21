@@ -500,14 +500,14 @@ def maybe_apply_force_family_baseline(
             elif verbosity >= Verbosity.BRIEF:
                 cs.StatusIndicator("warning").add_message(
                     f"[field]Family:[/field] '{fam}' — "
-                    "[bold]--line-box-main-cluster:[/bold] no family fonts matched "
-                    "main cluster snapshot; using full family for reference selection",
+                    "[bold]--line-box force-baseline-main-cluster:[/bold] no family fonts "
+                    "matched main cluster snapshot; using full family for reference selection",
                 ).emit(console)
         elif verbosity >= Verbosity.VERBOSE:
             cs.StatusIndicator("info").add_message(
                 f"[field]Family:[/field] '{fam}' — "
-                "[dim]--line-box-main-cluster:[/dim] no cluster snapshot for this "
-                "family — using full group for reference selection",
+                "[dim]--line-box force-baseline-main-cluster:[/dim] no cluster snapshot for "
+                "this family — using full group for reference selection",
             ).emit(console)
 
     best: Optional[FontMeasures] = None
@@ -582,7 +582,8 @@ def maybe_apply_force_family_baseline(
         )
     if getattr(config, "force_baseline_main_cluster_only", False) and not chosen_explicit:
         indicator.add_item(
-            "Reference pool limited to largest optical cluster (--line-box-main-cluster)",
+            "Reference pool limited to largest optical cluster "
+            "(--line-box force-baseline-main-cluster)",
             indent_level=1,
         )
     if getattr(best, "is_decorative_outlier", False) or getattr(best, "is_script", False):
@@ -838,7 +839,7 @@ def build_plans(
     clusters_cache: Dict[str, Dict[str, List[str]]] = {}
 
     for fam, group in families.items():
-        # Snapshot for --line-box-main-cluster (per iteration; clears prior family leak)
+        # Snapshot for --line-box force-baseline-main-cluster (per iteration; clears prior family leak)
         baseline_mc_snap: Optional[List[FontMeasures]] = None
         # Compute UPM majority for status reporting
         upm_counts: Dict[int, int] = {}
