@@ -72,6 +72,10 @@ MODE_SUMMARY = {
     "probe": "read-only MVAR/HVAR coverage report; no grouping, measuring, or writing",
 }
 
+# Coupled to the inline={"line box (typo / hhea)": ...} placement in
+# _build_family/_build_superfamily: the --line-box help string says
+# "see modes below" because this table prints immediately after that
+# group. If the table ever moves to the footer, update that help string.
 LINE_BOX_MODES = {
     "auto": "each font keeps its own planned typo/hhea values (default)",
     "force-baseline": "unify typo/hhea across the family using its largest-span style "
@@ -139,7 +143,9 @@ def _add_report_arg(g: argparse._ArgumentGroup) -> None:
     )
 
 
-def _add_spacing_args(g: argparse._ArgumentGroup) -> None:
+def _add_spacing_args(
+    g: argparse._ArgumentGroup, *, include_max_adjustment: bool = True
+) -> None:
     g.add_argument(
         "--letter-height", type=float, default=130, metavar="PERCENT",
         help="target height of the letter span (default: 130)",
@@ -148,11 +154,16 @@ def _add_spacing_args(g: argparse._ArgumentGroup) -> None:
         "--top-margin", type=float, default=25, metavar="PERCENT",
         help="extra space above capitals (default: 25)",
     )
-    g.add_argument(
-        "--max-adjustment", type=float, default=None, metavar="PERCENT",
-        help="cap how far family extremes may pull a font (default: no cap); "
-        "fonts over the cap are calculated individually",
-    )
+    # --max-adjustment only does anything when a multi-font cluster can pull
+    # a member font; individual mode always plans one font at a time, so the
+    # pull check never fires (planning.py plan_identical_metrics). Omit it
+    # there rather than accept a silent no-op.
+    if include_max_adjustment:
+        g.add_argument(
+            "--max-adjustment", type=float, default=None, metavar="PERCENT",
+            help="cap how far family extremes may pull a font (default: no cap); "
+            "fonts over the cap are calculated individually",
+        )
     g.add_argument(
         "--no-auto-adjust", action="store_true",
         help="use exactly --letter-height (skip the x-height adjustment)",
@@ -268,7 +279,7 @@ def _build_individual(subparsers: argparse._SubParsersAction) -> None:
     _add_general_args(g_gen, "verbose output; -vv for debug output")
     _add_input_args(g_in)
     _add_preview_args(g_run)
-    _add_spacing_args(g_space)
+    _add_spacing_args(g_space, include_max_adjustment=False)
     _add_detection_args(p, g_det)
 
 
@@ -422,7 +433,9 @@ def _build_probe(subparsers: argparse._SubParsersAction) -> None:
             docs_section(DOCS_URL),
         ],
     )
-    _add_general_args(g_gen, "verbose output (per-pole deltas)")
+    _add_general_args(
+        g_gen, "verbose output (per-pole deltas); repeating has no extra effect"
+    )
     _add_input_args(g_in)
 
 
@@ -452,8 +465,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     g_gen.add_argument("--version", action="version", version=f"{PROG} {__version__}")
 
+    # prog=PROG keeps each subparser's %(prog)s as "ebrium <name>". Without
+    # it, older argparse (pre-3.14) builds the subparser prog from the
+    # parent's custom usage= string, so usage lines double:
+    # "ebrium {individual,...} [options] [PATH ...] individual [options]..."
     subparsers = p.add_subparsers(
         dest="mode", metavar="MODE", required=True,
+        prog=PROG,
         help="grouping subcommand; see 'subcommands' below",
     )
     _build_individual(subparsers)
@@ -501,3 +519,7 @@ def finalize_args(args: argparse.Namespace) -> None:
     args.ignore_prefix = getattr(args, "ignore_prefix", None)
     args.exclude = getattr(args, "exclude", None)
     args.report = getattr(args, "report", False)
+    # individual omits --max-adjustment (silent no-op there); default it so
+    # cli.py's MetricsConfig construction never AttributeErrors.
+    if not hasattr(args, "max_adjustment"):
+        args.max_adjustment = None

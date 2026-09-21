@@ -1,5 +1,26 @@
 # Changelog
 
+## [3.0.1] - 2026-09-21
+
+### Fixed
+- Subcommand usage lines doubled on Python &lt; 3.14
+  (`usage: ebrium {individual,...} [options] [PATH ...] individual [options]...`)
+  because `add_subparsers()` built each subparser's `prog` from the parent's
+  custom `usage=` string. Pass `prog=PROG` so each expands to
+  `ebrium individual` / `ebrium family` / etc. (3.14 already ignored the
+  custom usage when building the prefix; this matches that on older
+  versions.)
+
+### Changed
+- Dropped `--max-adjustment` from `ebrium individual`. The pull check in
+  `plan_identical_metrics` only fires when `len(main_cluster) > 1`, and
+  individual mode always plans one font at a time, so the flag was a
+  silent no-op — the same class of problem the subcommand split was meant
+  to turn into an argparse error. Still present under `family` /
+  `superfamily`.
+- `ebrium probe -v` help now notes that repeating (`-vv`) has no extra
+  effect (`cli.py` only checks `verbose >= 1` for probe).
+
 ## [3.0.0] - 2026-09-21
 
 ### Changed (breaking)

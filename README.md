@@ -1,6 +1,6 @@
 # ebrium
 
-**Version 3.0.0**
+**Version 3.0.1**
 
 Normalize vertical metrics across a font family without changing unitsPerEm or glyph outlines.
 
@@ -106,12 +106,11 @@ subcommand now because that's what it actually is.
 |------|---------|
 | `--letter-height PERCENT` | Target letter span (default: 130) |
 | `--top-margin PERCENT` | Extra space above capitals (default: 25) |
-| `--max-adjustment PERCENT` | Cap how far family extremes may pull a font |
 | `--no-auto-adjust` | Use exact `--letter-height` (no x-height tweak) |
 
 **Detection overrides (glob patterns, repeatable):** `--assume-script`, `--assume-decorative`, `--assume-unicase`, `--assume-uniwidth`, `--exclude-measuring`
 
-**General:** `-h, --help`, `--version`, `-v / -vv`
+**General:** `-h, --help`, `--version`, `-v / -vv` (`probe`: `-v` shows per-pole deltas; repeating has no extra effect)
 
 ### `family` only
 
@@ -121,13 +120,12 @@ subcommand now because that's what it actually is.
 
 ### `family` and `superfamily`
 
-**Grouping modifiers (repeatable):**
-
 | Flag | Meaning |
 |------|---------|
-| `--combine "A,B"` | Force-merge families |
-| `--ignore-prefix TOKEN` | Ignore a leading token when matching family names |
-| `--exclude FAMILY` | Keep a family out of the merge (**`superfamily` only**) |
+| `--max-adjustment PERCENT` | Cap how far family extremes may pull a font (omitted under `individual` — no multi-font pull to cap) |
+| `--combine "A,B"` | Force-merge families (repeatable) |
+| `--ignore-prefix TOKEN` | Ignore a leading token when matching family names (repeatable) |
+| `--exclude FAMILY` | Keep a family out of the merge (**`superfamily` only**, repeatable) |
 
 **Report:** `--report` — family vs per-font analysis (implies `--dry-run`)
 

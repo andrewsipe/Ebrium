@@ -12,6 +12,9 @@ FontCore is vendored (console + collector + sorter + CLI help); no submodule.
 - Standalone installable package with GitHub install paths
 - Vendored FontCore subset
 - FontFixer-style `--help` (`FontCore.core_cli_help` + `ebrium.cli_parser`)
+- v3.0.1 polish: `add_subparsers(prog=PROG)` so usage lines don't double on
+  Python &lt; 3.14; dropped inert `--max-adjustment` from `individual`; probe
+  `-v` help notes that repeating has no extra effect
 - Subcommands replace the flat flag surface (v3.0.0, breaking):
   `ebrium {individual,family,superfamily,probe} [options] [PATH ...]`,
   subcommand required (no implicit default). Each subcommand's parser only
