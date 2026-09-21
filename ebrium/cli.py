@@ -50,9 +50,11 @@ def scan_fonts(paths: Iterable[str], recursive: bool, include_ttx: bool) -> List
 
 
 def parse_args() -> argparse.Namespace:
-    from .cli_parser import build_parser
+    from .cli_parser import build_parser, finalize_args
 
-    return build_parser().parse_args()
+    args = build_parser().parse_args()
+    finalize_args(args)
+    return args
 
 
 

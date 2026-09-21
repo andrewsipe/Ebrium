@@ -1,6 +1,6 @@
 # ebrium
 
-**Version 1.0.1**
+**Version 2.0.0**
 
 Normalize vertical metrics across a font family without changing unitsPerEm or glyph outlines.
 
@@ -79,14 +79,18 @@ ebrium /path/to/fonts -r --report
 | `--max-adjustment PERCENT` | Cap how far family extremes may pull a font |
 | `--no-auto-adjust` | Use exact `--letter-height` (no x-height tweak) |
 
-### Grouping (choose one)
+### Grouping mode
 
-| Flag | Meaning |
+One flag, four choices — `--safe-max` was never a fifth independent mode; it's
+always plain family grouping with clustering turned off, so it reads as a
+variant of `--grouping family`.
+
+| `--grouping MODE` | Meaning |
 |------|---------|
-| `--family` | Group by family name, cluster within families (**default**) |
-| `--superfamily` | Merge shared-prefix families, cluster across the superfamily |
-| `--individual` | Normalize each font alone (no grouping/clustering) |
-| `--safe-max` | Per family, use bbox extremes for all fonts (no clustering) |
+| `family` | Group by family name, cluster within families (**default**) |
+| `family-safe-max` | Group by family; bbox extremes for every font, no clustering (prevents clipping) |
+| `superfamily` | Merge shared-prefix families, cluster across the superfamily |
+| `individual` | Normalize each font alone (no grouping/clustering) |
 
 ### Grouping modifiers
 
@@ -94,20 +98,29 @@ ebrium /path/to/fonts -r --report
 |------|---------|
 | `--combine "A,B"` | Force-merge families (repeatable) |
 | `--ignore-prefix TOKEN` | Ignore token when normalizing names (repeatable) |
-| `--exclude NAME` | Keep family out of superfamily merges (repeatable) |
-| `--force-baseline` | Unify typo/hhea line box across the family |
-| `--force-baseline-main-cluster` | With `--force-baseline`, pick reference from largest optical cluster |
-| `--force-baseline-from PATH_OR_GLOB` | Pin baseline reference file |
+| `--exclude NAME` | Keep family out of superfamily merges (`--grouping superfamily` only, repeatable) |
+
+### Line box (typo / hhea)
+
+One flag, three choices — `--force-baseline` and `--safe-hhea` used to be
+independent booleans, but `--safe-hhea` always silently overrode
+`--force-baseline` at runtime, so they're now one choice instead of two
+flags that can't actually be combined.
+
+| `--line-box MODE` | Meaning |
+|------|---------|
+| `auto` | Each font keeps its own planned typo/hhea values (**default**) |
+| `force-baseline` | Unify typo/hhea across the family using its largest-span style |
+| `safe-hhea` | Average existing typo/hhea across the family and apply uniformly |
+
+| Modifier | Meaning |
+|------|---------|
+| `--line-box-main-cluster` | With `--line-box force-baseline`, pick reference from largest optical cluster only |
+| `--line-box-from PATH_OR_GLOB` | With `--line-box force-baseline`, pin the reference font |
 
 ### Detection overrides (glob patterns, repeatable)
 
 `--assume-script`, `--assume-decorative`, `--assume-unicase`, `--assume-uniwidth`, `--exclude-measuring`
-
-### Safe hhea mode
-
-| Flag | Meaning |
-|------|---------|
-| `--safe-hhea` | Average existing hhea/typo across the family and apply uniformly |
 
 ## How it works
 

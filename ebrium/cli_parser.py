@@ -1,20 +1,35 @@
 """ebrium argument parser (drop-in for the body of cli.parse_args()).
 
-Same flags, dests and defaults as before; only the presentation changed:
-  * one-line help strings; interaction rules moved to a "notes" footer
-  * grouping mode is a real mutually exclusive group containing --safe-max
-    (replaces the mode._group_actions.append(...) workaround)
-  * --top-margin / --use-ttx / --no-auto-adjust moved into sensible groups
-  * hand-written usage line (the generated one wrapped to 7 lines)
-  * prog is pinned so `python -m ebrium` doesn't print "__main__.py"
-  * --version added; -h/--version/-v grouped at the bottom
+On top of the FontFixer-style presentation (grouped options, safety panel,
+notes footer, hand-written usage, pinned prog), two flag families are
+consolidated into single choice arguments:
+
+  * --grouping {family, family-safe-max, superfamily, individual} replaces
+    the four standalone flags --family/--superfamily/--individual/--safe-max.
+    "safe-max" was never a fifth independent axis - grouping.py always runs
+    it through group_by_family() - so it reads better as a family variant.
+  * --line-box {auto, force-baseline, safe-hhea} replaces the two booleans
+    --force-baseline/--safe-hhea. planning.py already treated them as
+    mutually exclusive at runtime (force_hhea short-circuits force_baseline
+    inside maybe_apply_force_family_baseline()); the parser now says so
+    up front instead of silently overriding one with the other.
+  * --line-box-from / --line-box-main-cluster replace
+    --force-baseline-from / --force-baseline-main-cluster so they read as
+    sub-options of --line-box rather than a separately-named pair.
+
+finalize_args() maps the two new choice flags back onto the attribute names
+the rest of the app already expects (grouping_mode, force_baseline,
+safe_hhea), so validation.py / planning.py / cli.py needed no changes beyond
+calling it once after parsing.
 
 In cli.py:
 
-    from .cli_parser import build_parser
+    from .cli_parser import build_parser, finalize_args
 
     def parse_args() -> argparse.Namespace:
-        return build_parser().parse_args()
+        args = build_parser().parse_args()
+        finalize_args(args)
+        return args
 """
 
 from __future__ import annotations
@@ -23,6 +38,7 @@ import argparse
 
 from FontCore.core_cli_help import (
     RichHelp,
+    choices_section,
     docs_section,
     examples_section,
     exit_status_section,
@@ -50,13 +66,32 @@ PANEL = safety_panel(
     ],
 )
 
+GROUPING_MODES = {
+    "family": "group by family name; cluster within each family (default)",
+    "family-safe-max": "group by family; bbox extremes for every font, no clustering (prevents clipping)",
+    "superfamily": "merge families sharing a name prefix; cluster across the superfamily",
+    "individual": "normalize each font on its own; no grouping or clustering",
+}
+
+LINE_BOX_MODES = {
+    "auto": "each font keeps its own planned typo/hhea values (default)",
+    "force-baseline": "unify typo/hhea across the family using its largest-span style "
+    "(macOS/UI centering follows typo/hhea)",
+    "safe-hhea": "average existing typo/hhea values across the family and apply them "
+    "uniformly (Win uses max ranges)",
+}
+
 EXAMPLES = [
     ("ebrium fonts/ -r", "normalize a tree (asks before writing)"),
     ("ebrium fonts/ -r -n", "preview the changes"),
     ("ebrium fonts/ -r --report", "family vs per-font analysis (implies -n)"),
     ("ebrium fonts/ -r -y", "skip the confirmation prompt"),
+    ("ebrium fonts/ --grouping family-safe-max", "no clustering; safest against clipping"),
     ("ebrium fonts/ --ignore-prefix Adobe", "ignore a vendor prefix when grouping"),
-    ('ebrium fonts/ --combine "A,B" --force-baseline', "merge two families, then unify the line box"),
+    (
+        'ebrium fonts/ --combine "A,B" --line-box force-baseline',
+        "merge two families, then unify the line box",
+    ),
     ("ebrium fonts/ --assume-script '*Swash*'", "override script detection by filename"),
 ]
 
@@ -64,14 +99,13 @@ NOTES = [
     "Every run, even with -n or --report, writes .metrics_checkpoint.json to the current "
     "directory. It caches measurements and clusters, and resets when the options or the "
     "font set change.",
-    "--combine, --ignore-prefix and --exclude are ignored with --individual; "
-    "--exclude only applies to --superfamily.",
-    "--safe-hhea takes precedence over --force-baseline, which is also ignored with --individual.",
-    "--force-baseline-main-cluster and --force-baseline-from only work together with "
-    "--force-baseline; --force-baseline-from wins if both are given.",
-    "--force-baseline skips single-font families (e.g. a lone 'Name Variable'); "
-    "pair them with --combine.",
-    "--probe-variation-metrics ignores -n, --report and the --force-baseline options; "
+    "--combine, --ignore-prefix and --exclude are ignored with --grouping individual; "
+    "--exclude only applies to --grouping superfamily.",
+    "--line-box-main-cluster and --line-box-from only work together with "
+    "--line-box force-baseline; --line-box-from wins if both are given.",
+    "--line-box force-baseline skips single-font families (e.g. a lone 'Name Variable'); "
+    "pair it with --combine.",
+    "--probe-variation-metrics ignores -n, --report and --line-box; "
     "add -v for per-pole deltas.",
 ]
 
@@ -95,7 +129,7 @@ def build_parser() -> argparse.ArgumentParser:
     g_in = p.add_argument_group("input")
     g_run = p.add_argument_group("preview and confirmation")
     g_space = p.add_argument_group("vertical spacing (% of UPM)")
-    g_mode = p.add_argument_group("grouping mode (choose one)")
+    g_mode = p.add_argument_group("grouping mode")
     g_mod = p.add_argument_group("grouping modifiers (repeatable)")
     g_box = p.add_argument_group("line box (typo / hhea)")
     g_det = p.add_argument_group("detection overrides (filename globs, repeatable)")
@@ -106,6 +140,8 @@ def build_parser() -> argparse.ArgumentParser:
         "-h", "--help", action=RichHelp, help="show this help message and exit",
         console=get_console(), panel=PANEL,
         footer=[
+            choices_section("--grouping modes", GROUPING_MODES),
+            choices_section("--line-box modes", LINE_BOX_MODES),
             examples_section(EXAMPLES),
             notes_section(NOTES),
             exit_status_section(EXIT_CODES),
@@ -158,29 +194,17 @@ def build_parser() -> argparse.ArgumentParser:
         help="use exactly --letter-height (skip the x-height adjustment)",
     )
 
-    # ---- grouping mode: one real mutually exclusive group, all four flags
-    mode = g_mode.add_mutually_exclusive_group()
-    mode.add_argument(
-        "--family", dest="grouping_mode", action="store_const", const="family",
-        help="group by family name; cluster within each family (default)",
+    # ---- grouping mode: one flag, four choices (meanings in the --help footer)
+    g_mode.add_argument(
+        "--grouping", dest="grouping_mode", default="family",
+        choices=["family", "family-safe-max", "superfamily", "individual"],
+        metavar="MODE",
+        help="how fonts are grouped and clustered (default: family; see modes below)",
     )
-    mode.add_argument(
-        "--superfamily", dest="grouping_mode", action="store_const", const="superfamily",
-        help="merge families sharing a name prefix; cluster across the superfamily",
-    )
-    mode.add_argument(
-        "--individual", dest="grouping_mode", action="store_const", const="individual",
-        help="normalize each font on its own; no grouping or clustering",
-    )
-    mode.add_argument(
-        "--safe-max", dest="grouping_mode", action="store_const", const="conservative",
-        help="per family, use bbox extremes for every font; no clustering (prevents clipping)",
-    )
-    p.set_defaults(grouping_mode="family")
 
     # ---- grouping modifiers
     g_mod.add_argument(
-        "--combine", action="append", metavar="FAMILIES",
+        "--combine", action="append", metavar="GROUP",
         help='force-merge families, e.g. --combine "Font A,Font B"',
     )
     g_mod.add_argument(
@@ -189,27 +213,23 @@ def build_parser() -> argparse.ArgumentParser:
     )
     g_mod.add_argument(
         "--exclude", action="append", metavar="FAMILY",
-        help="keep FAMILY out of superfamily merges (--superfamily only)",
+        help="keep FAMILY out of superfamily merges (--grouping superfamily only)",
     )
 
-    # ---- line box
+    # ---- line box: one flag, three choices, plus two force-baseline modifiers
     g_box.add_argument(
-        "--force-baseline", action="store_true",
-        help="unify the typo/hhea line box across each family, using its largest-span style "
-        "(macOS/UI centering follows typo/hhea)",
+        "--line-box", dest="line_box", default="auto",
+        choices=["auto", "force-baseline", "safe-hhea"],
+        metavar="MODE",
+        help="how typo/hhea is set across a family (default: auto; see modes below)",
     )
     g_box.add_argument(
-        "--force-baseline-main-cluster", action="store_true",
-        help="with --force-baseline: pick the reference from the largest optical cluster only",
+        "--line-box-main-cluster", dest="force_baseline_main_cluster", action="store_true",
+        help="with --line-box force-baseline: pick the reference from the largest optical cluster only",
     )
     g_box.add_argument(
-        "--force-baseline-from", default=None, metavar="PATH_OR_GLOB",
-        help="with --force-baseline: pin the reference font (path, filename, or filename glob)",
-    )
-    g_box.add_argument(
-        "--safe-hhea", action="store_true",
-        help="average existing typo/hhea values across each family and apply them "
-        "uniformly (Win uses max ranges)",
+        "--line-box-from", dest="force_baseline_from", default=None, metavar="PATH_OR_GLOB",
+        help="with --line-box force-baseline: pin the reference font (path, filename, or filename glob)",
     )
 
     # ---- detection overrides
@@ -239,3 +259,17 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--unicase-threshold", type=float, default=0.05, help=argparse.SUPPRESS)
     p.add_argument("--max-span-ratio", type=float, default=1.5, help=argparse.SUPPRESS)
     return p
+
+
+def finalize_args(args: argparse.Namespace) -> None:
+    """Map the consolidated --grouping/--line-box choices onto the attribute
+    names the rest of the app expects. Call this once, right after parse_args().
+
+    --grouping family-safe-max -> args.grouping_mode = "conservative"
+    --line-box force-baseline  -> args.force_baseline = True
+    --line-box safe-hhea       -> args.safe_hhea = True
+    """
+    if args.grouping_mode == "family-safe-max":
+        args.grouping_mode = "conservative"
+    args.force_baseline = args.line_box == "force-baseline"
+    args.safe_hhea = args.line_box == "safe-hhea"

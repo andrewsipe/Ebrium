@@ -99,11 +99,17 @@ def safety_panel(
 
 # ------------------------------------------------------------- sections
 
-def handlers_section(handlers: Mapping[str, str], note: str = "") -> RenderableType:
+def choices_section(title: str, choices: Mapping[str, str], note: str = "") -> RenderableType:
+    """Table of value -> meaning, for a --flag {a,b,c}-style argument whose
+    choices need more room than a one-line option help string allows."""
     grid = _grid()
-    for name, desc in handlers.items():
+    for name, desc in choices.items():
         grid.add_row(Text(name, style=FLAG), Text(desc))
-    return _section("handlers", grid, note)
+    return _section(title, grid, note)
+
+
+def handlers_section(handlers: Mapping[str, str], note: str = "") -> RenderableType:
+    return choices_section("handlers", handlers, note)
 
 
 def _command(cmd: str) -> Text:

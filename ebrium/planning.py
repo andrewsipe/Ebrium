@@ -412,7 +412,7 @@ def _bbox_span_norm_for_reference(fm: FontMeasures) -> float:
 def _fonts_matching_force_baseline_from(
     group: List[FontMeasures], pattern: str
 ) -> List[FontMeasures]:
-    """Match family members to --force-baseline-from (path, filename, or fnmatch on basename)."""
+    """Match family members to --line-box-from (path, filename, or fnmatch on basename)."""
     pattern = pattern.strip()
     if not pattern:
         return []
@@ -500,13 +500,13 @@ def maybe_apply_force_family_baseline(
             elif verbosity >= Verbosity.BRIEF:
                 cs.StatusIndicator("warning").add_message(
                     f"[field]Family:[/field] '{fam}' — "
-                    "[bold]--force-baseline-main-cluster:[/bold] no family fonts matched "
+                    "[bold]--line-box-main-cluster:[/bold] no family fonts matched "
                     "main cluster snapshot; using full family for reference selection",
                 ).emit(console)
         elif verbosity >= Verbosity.VERBOSE:
             cs.StatusIndicator("info").add_message(
                 f"[field]Family:[/field] '{fam}' — "
-                "[dim]--force-baseline-main-cluster:[/dim] no cluster snapshot for this "
+                "[dim]--line-box-main-cluster:[/dim] no cluster snapshot for this "
                 "family — using full group for reference selection",
             ).emit(console)
 
@@ -529,18 +529,18 @@ def maybe_apply_force_family_baseline(
             best = viable[0]
             chosen_explicit = True
             cs.StatusIndicator("warning").add_message(
-                f"[field]Family:[/field] '{fam}' — [bold]--force-baseline-from[/bold] matched "
+                f"[field]Family:[/field] '{fam}' — [bold]--line-box-from[/bold] matched "
                 f"{len(viable)} font(s); using {Path(best.path).name} (first by path sort)",
             ).emit(console)
         elif raw_matches:
             cs.StatusIndicator("warning").add_message(
-                f"[field]Family:[/field] '{fam}' — [bold]--force-baseline-from[/bold] matched "
+                f"[field]Family:[/field] '{fam}' — [bold]--line-box-from[/bold] matched "
                 f"{len(raw_matches)} font(s) but none have planned typo targets yet; "
                 "falling back to automatic reference",
             ).emit(console)
         else:
             cs.StatusIndicator("warning").add_message(
-                f"[field]Family:[/field] '{fam}' — [bold]--force-baseline-from[/bold] "
+                f"[field]Family:[/field] '{fam}' — [bold]--line-box-from[/bold] "
                 f"{explicit_pattern!r} matched no font in this group; "
                 "falling back to automatic reference",
             ).emit(console)
@@ -558,7 +558,7 @@ def maybe_apply_force_family_baseline(
 
     if best is None:
         cs.StatusIndicator("warning").add_message(
-            f"[field]Family:[/field] '{fam}' — --force-baseline skipped "
+            f"[field]Family:[/field] '{fam}' — --line-box force-baseline skipped "
             "(no fonts with planned typo targets)",
         ).emit(console)
         return
@@ -577,12 +577,12 @@ def maybe_apply_force_family_baseline(
     )
     if chosen_explicit:
         indicator.add_item(
-            "Reference from --force-baseline-from (not auto largest span)",
+            "Reference from --line-box-from (not auto largest span)",
             indent_level=1,
         )
     if getattr(config, "force_baseline_main_cluster_only", False) and not chosen_explicit:
         indicator.add_item(
-            "Reference pool limited to largest optical cluster (--force-baseline-main-cluster)",
+            "Reference pool limited to largest optical cluster (--line-box-main-cluster)",
             indent_level=1,
         )
     if getattr(best, "is_decorative_outlier", False) or getattr(best, "is_script", False):
@@ -838,7 +838,7 @@ def build_plans(
     clusters_cache: Dict[str, Dict[str, List[str]]] = {}
 
     for fam, group in families.items():
-        # Snapshot for --force-baseline-main-cluster (per iteration; clears prior family leak)
+        # Snapshot for --line-box-main-cluster (per iteration; clears prior family leak)
         baseline_mc_snap: Optional[List[FontMeasures]] = None
         # Compute UPM majority for status reporting
         upm_counts: Dict[int, int] = {}
