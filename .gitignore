@@ -1,0 +1,38 @@
+# macOS
+.DS_Store
+**/.DS_Store
+
+# Python
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+*.egg
+.eggs/
+build/
+dist/
+wheels/
+.venv/
+venv/
+
+# Testing / linters
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Editor
+.idea/
+.vscode/
+*.swp
+*~
+
+# ebrium checkpoint files
+.metrics_checkpoint.json
+*.metrics_checkpoint.json
+
+# Font processing temps
+*.ttx.tmp
+temp_font_metadata.tmp

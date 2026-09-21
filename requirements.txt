@@ -1,0 +1,8 @@
+# ebrium dependencies
+# Vertical metrics normalization for single fonts and families.
+
+fonttools>=4.40.0
+rich>=13.0.0
+
+# WOFF2 support (fonttools uses Brotli to decompress WOFF2)
+brotli>=1.0.9
