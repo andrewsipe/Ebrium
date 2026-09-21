@@ -1,6 +1,6 @@
 # ebrium
 
-**Version 1.0.0**
+**Version 1.0.1**
 
 Normalize vertical metrics across a font family without changing unitsPerEm or glyph outlines.
 

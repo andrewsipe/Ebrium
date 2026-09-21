@@ -5,11 +5,23 @@ Standalone product tree for https://github.com/andrewsipe/ebrium
 ## Origin
 
 Consolidated from monorepo `FontMetricsNormalizer/` (package was already named `ebrium`).
-FontCore is vendored (console + collector + sorter); no submodule.
+FontCore is vendored (console + collector + sorter + CLI help); no submodule.
 
-## Deferred (housekeeping pass)
+## Done
 
-1. CLI / `--help` polish (FontFixer-style groups, safety wording, Rich footer)
+- Standalone installable package with GitHub install paths
+- Vendored FontCore subset
+- FontFixer-style `--help` (`FontCore.core_cli_help` + `ebrium.cli_parser`)
+
+## Known behavior (documented in `--help` notes)
+
+- Even `-n` / `--report` write `.metrics_checkpoint.json` in the **current** directory
+- `--combine` is ignored with `--individual` (`validate_args` warns)
+- Exit code `2` is used both for “no measurable fonts” and by argparse for bad args
+
+## Deferred
+
+1. Optional: skip checkpoint writes in dry-run / report / probe modes
 2. Tests / fixtures
 3. Optional split of large `planning.py`
 4. Archive or redirect old `FontMetricsNormalizer` GitHub remote when ready
