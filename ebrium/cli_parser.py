@@ -96,9 +96,9 @@ MODE_SUMMARY = {
 }
 
 # Coupled to inline tables under "line box (typo / hhea)" and "detection
-# overrides..." in _build_family/_build_superfamily/_build_individual: help
-# strings that say "see table below" assume these print immediately after
-# those groups. If a table moves to the footer, update the matching help.
+# overrides..." : help strings that say "see table below" / "see modes below"
+# assume these print immediately after those groups. If a table moves to the
+# footer, update the matching help.
 LINE_BOX_MODES = {
     "auto": "each font keeps its own planned typo/hhea values (default)",
     "force-baseline": "unify typo/hhea across the family using its largest-span style "
@@ -274,10 +274,14 @@ def _build_individual(subparsers: argparse._SubParsersAction) -> None:
         description="Normalize each font's own vertical metrics -- no grouping, no clustering.",
         add_help=False,
     )
+    # Group *creation* order is display order (argparse), independent of when
+    # arguments are added to each group below. Non-metrics groups (which fonts
+    # get picked up, previewed, classified) come first; the one metrics group
+    # -- the actual normalization knobs -- comes last, before "general".
     g_in = p.add_argument_group("input")
     g_run = p.add_argument_group("preview and confirmation")
-    g_space = p.add_argument_group("vertical spacing (% of UPM)")
     g_det = p.add_argument_group("detection overrides (filename globs, repeatable)")
+    g_space = p.add_argument_group("vertical spacing (% of UPM)")
     g_gen = p.add_argument_group("general")
 
     examples = [
@@ -300,11 +304,11 @@ def _build_individual(subparsers: argparse._SubParsersAction) -> None:
             docs_section(DOCS_URL),
         ],
     )
-    _add_general_args(g_gen, "verbose output; -vv for debug output")
     _add_input_args(g_in)
     _add_preview_args(g_run)
-    _add_spacing_args(g_space, include_max_adjustment=False)
     _add_detection_args(p, g_det)
+    _add_spacing_args(g_space, include_max_adjustment=False)
+    _add_general_args(g_gen, "verbose output; -vv for debug output")
 
 
 def _build_family(subparsers: argparse._SubParsersAction) -> None:
@@ -315,13 +319,16 @@ def _build_family(subparsers: argparse._SubParsersAction) -> None:
         description="Normalize vertical metrics within families, clustering optically similar styles together.",
         add_help=False,
     )
+    # Non-metrics groups (sorting/analysis) first, ordered by how often they
+    # come up; the two metrics groups -- the actual normalization knobs --
+    # come last, before "general". See _build_individual for the same logic.
     g_in = p.add_argument_group("input")
     g_run = p.add_argument_group("preview and confirmation")
-    g_space = p.add_argument_group("vertical spacing (% of UPM)")
-    g_cluster = p.add_argument_group("clustering")
     g_mod = p.add_argument_group("grouping modifiers (repeatable)")
-    g_box = p.add_argument_group("line box (typo / hhea)")
+    g_cluster = p.add_argument_group("clustering")
     g_det = p.add_argument_group("detection overrides (filename globs, repeatable)")
+    g_space = p.add_argument_group("vertical spacing (% of UPM)")
+    g_box = p.add_argument_group("line box (typo / hhea)")
     g_gen = p.add_argument_group("general")
 
     examples = [
@@ -362,18 +369,18 @@ def _build_family(subparsers: argparse._SubParsersAction) -> None:
             docs_section(DOCS_URL),
         ],
     )
-    _add_general_args(g_gen, "verbose output; -vv for debug output")
     _add_input_args(g_in)
     _add_preview_args(g_run)
     _add_report_arg(g_run)
-    _add_spacing_args(g_space)
+    _add_grouping_mod_args(g_mod)
     g_cluster.add_argument(
         "--safe-max", action="store_true",
         help="bbox extremes for every font in the family instead of clustering (prevents clipping)",
     )
-    _add_grouping_mod_args(g_mod)
-    _add_line_box_args(g_box)
     _add_detection_args(p, g_det)
+    _add_spacing_args(g_space)
+    _add_line_box_args(g_box)
+    _add_general_args(g_gen, "verbose output; -vv for debug output")
 
 
 def _build_superfamily(subparsers: argparse._SubParsersAction) -> None:
@@ -384,12 +391,14 @@ def _build_superfamily(subparsers: argparse._SubParsersAction) -> None:
         description="Merge families sharing a name prefix and cluster optically similar styles across the merge.",
         add_help=False,
     )
+    # Same ordering logic as _build_family: non-metrics (sorting/analysis)
+    # groups first, then the metrics groups, then "general" last.
     g_in = p.add_argument_group("input")
     g_run = p.add_argument_group("preview and confirmation")
-    g_space = p.add_argument_group("vertical spacing (% of UPM)")
     g_mod = p.add_argument_group("grouping modifiers (repeatable)")
-    g_box = p.add_argument_group("line box (typo / hhea)")
     g_det = p.add_argument_group("detection overrides (filename globs, repeatable)")
+    g_space = p.add_argument_group("vertical spacing (% of UPM)")
+    g_box = p.add_argument_group("line box (typo / hhea)")
     g_gen = p.add_argument_group("general")
 
     examples = [
@@ -428,18 +437,18 @@ def _build_superfamily(subparsers: argparse._SubParsersAction) -> None:
             docs_section(DOCS_URL),
         ],
     )
-    _add_general_args(g_gen, "verbose output; -vv for debug output")
     _add_input_args(g_in)
     _add_preview_args(g_run)
     _add_report_arg(g_run)
-    _add_spacing_args(g_space)
     _add_grouping_mod_args(g_mod)
     g_mod.add_argument(
         "-e", "--exclude", action="append", metavar="FAMILY",
         help="keep FAMILY out of the superfamily merge",
     )
-    _add_line_box_args(g_box)
     _add_detection_args(p, g_det)
+    _add_spacing_args(g_space)
+    _add_line_box_args(g_box)
+    _add_general_args(g_gen, "verbose output; -vv for debug output")
 
 
 def _build_probe(subparsers: argparse._SubParsersAction) -> None:

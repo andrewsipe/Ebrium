@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.2.1] - 2026-09-21
+
+### Changed
+- Reordered `--help` argument groups so non-metrics options come first
+  (input → preview → grouping/clustering → detection) and metrics knobs
+  last before `general` (vertical spacing → line box). Display-only;
+  flag behavior unchanged. `probe` is unchanged (input → general).
+
 ## [3.2.0] - 2026-09-21
 
 ### Changed (breaking)

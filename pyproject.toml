@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ebrium"
-version = "3.2.0"
+version = "3.2.1"
 description = "Normalize vertical metrics across font families (cap-height anchored)"
 readme = "README.md"
 requires-python = ">=3.9"
