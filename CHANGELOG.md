@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.2.2] - 2026-09-21
+
+### Changed
+- `--safe-max` help and its group title (`clustering override`) now make clear
+  that clustering is the default under `family`, and `--safe-max` is an
+  advanced opt-out for unpredictable or incorrectly detected metrics — not
+  the primary clustering control.
+
 ## [3.2.1] - 2026-09-21
 
 ### Changed

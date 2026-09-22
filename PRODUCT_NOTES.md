@@ -12,6 +12,8 @@ FontCore is vendored (console + collector + sorter + CLI help); no submodule.
 - Standalone installable package with GitHub install paths
 - Vendored FontCore subset
 - FontFixer-style `--help` (`FontCore.core_cli_help` + `ebrium.cli_parser`)
+- v3.2.2: `--safe-max` framed as clustering override (advanced), not the
+  default path
 - v3.2.1: `--help` group order is non-metrics first, metrics last before
   `general` (display-only)
 - v3.2.0: `--ignore-prefix` → `--ignore-term` (accurate help + downstream

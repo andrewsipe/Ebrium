@@ -1,6 +1,6 @@
 # ebrium
 
-**Version 3.2.1**
+**Version 3.2.2**
 
 Normalize vertical metrics across a font family without changing unitsPerEm or glyph outlines.
 
@@ -116,7 +116,7 @@ subcommand now because that's what it actually is.
 
 | Flag | Meaning |
 |------|---------|
-| `--safe-max` | bbox extremes for every font in the family instead of clustering (prevents clipping) |
+| `--safe-max` | Skip clustering; bbox extremes for every font (default is to cluster; advanced — for unpredictable / mis-detected metrics) |
 
 ### `family` and `superfamily`
 

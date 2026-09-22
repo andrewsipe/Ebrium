@@ -325,7 +325,7 @@ def _build_family(subparsers: argparse._SubParsersAction) -> None:
     g_in = p.add_argument_group("input")
     g_run = p.add_argument_group("preview and confirmation")
     g_mod = p.add_argument_group("grouping modifiers (repeatable)")
-    g_cluster = p.add_argument_group("clustering")
+    g_cluster = p.add_argument_group("clustering override")
     g_det = p.add_argument_group("detection overrides (filename globs, repeatable)")
     g_space = p.add_argument_group("vertical spacing (% of UPM)")
     g_box = p.add_argument_group("line box (typo / hhea)")
@@ -336,7 +336,7 @@ def _build_family(subparsers: argparse._SubParsersAction) -> None:
         ("ebrium family fonts/ -r -n", "preview the changes"),
         ("ebrium family fonts/ -r --report", "family vs per-font analysis (implies -n)"),
         ("ebrium family fonts/ -r -y", "skip the confirmation prompt"),
-        ("ebrium family fonts/ --safe-max", "no clustering; safest against clipping"),
+        ("ebrium family fonts/ --safe-max", "skip clustering (unpredictable / mis-detected metrics)"),
         ("ebrium family fonts/ --ignore-term Adobe", "drop a shared word before grouping"),
         ('ebrium family fonts/ --combine "A,B"', "force-merge two families before clustering"),
         ("ebrium family fonts/ --line-box force-baseline", "unify the typo/hhea line box"),
@@ -375,7 +375,9 @@ def _build_family(subparsers: argparse._SubParsersAction) -> None:
     _add_grouping_mod_args(g_mod)
     g_cluster.add_argument(
         "--safe-max", action="store_true",
-        help="bbox extremes for every font in the family instead of clustering (prevents clipping)",
+        help="skip clustering; use bbox extremes for every font in the family "
+        "(default is to cluster; advanced — for unpredictable metrics that get "
+        "incorrectly detected)",
     )
     _add_detection_args(p, g_det)
     _add_spacing_args(g_space)
