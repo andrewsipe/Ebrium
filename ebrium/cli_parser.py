@@ -28,7 +28,7 @@ The subcommand is required; there's no implicit default mode.
 finalize_args() still bridges the result back onto the attribute names
 grouping.py/planning.py/validation.py/cli.py/measurements.py already expect
 (grouping_mode, force_baseline, force_baseline_main_cluster, safe_hhea,
-combine, ignore_prefix, exclude, report, assume_script/decorative/unicase/
+combine, ignore_term, exclude, report, assume_script/decorative/unicase/
 uniwidth), defaulting the ones a given subcommand doesn't expose (e.g.
 args.combine is always present, None under `individual`/`probe`) so the
 rest of the app never needs to branch on args.mode itself.
@@ -95,11 +95,10 @@ MODE_SUMMARY = {
     "probe": "read-only MVAR/HVAR coverage report; no grouping, measuring, or writing",
 }
 
-# Coupled to the inline={"line box (typo / hhea)": ...} placement in
-# _build_family/_build_superfamily: the --line-box help string says
-# "see modes below" because this table prints immediately after that
-# group. Same for ASSUME_TYPES under "detection overrides...". If either
-# table moves to the footer, update the matching help string.
+# Coupled to inline tables under "line box (typo / hhea)" and "detection
+# overrides..." in _build_family/_build_superfamily/_build_individual: help
+# strings that say "see table below" assume these print immediately after
+# those groups. If a table moves to the footer, update the matching help.
 LINE_BOX_MODES = {
     "auto": "each font keeps its own planned typo/hhea values (default)",
     "force-baseline": "unify typo/hhea across the family using its largest-span style "
@@ -127,6 +126,13 @@ CHECKPOINT_NOTE = (
     "Every run, even with -n, writes .metrics_checkpoint.json to the current "
     "directory. It caches measurements and clusters, and resets when the options "
     "or the font set change."
+)
+
+COMBINE_NOTE = (
+    '--combine merges the families named in ONE flag, e.g. --combine "A,B". Repeat '
+    "--combine for further groups, but a group must be complete in a single flag: "
+    "-c A -c B does not merge A with B -- each is its own group of one and gets "
+    "skipped with a warning."
 )
 
 PANEL_ROWS_BASIC = [("Preview only", "-n, --dry-run")]
@@ -170,11 +176,13 @@ def _add_report_arg(g: argparse._ArgumentGroup) -> None:
 def _add_spacing_args(g: argparse._ArgumentGroup, *, include_max_adjustment: bool = True) -> None:
     g.add_argument(
         "-l", "--letter-height", type=float, default=130, metavar="PERCENT",
-        help="target height of the letter span (default: 130)",
+        help="target height of the letter span (default: 130); a floor, not a fixed "
+        "value -- auto-adjust may raise it for large x-heights, see --no-auto-adjust",
     )
     g.add_argument(
         "-t", "--top-margin", type=float, default=25, metavar="PERCENT",
-        help="extra space above capitals (default: 25)",
+        help="extra space above capitals (default: 25); ignored for a font whose actual "
+        "ascenders already clear it by a wide margin, which keeps its own ascender height",
     )
     if include_max_adjustment:
         # Meaningless under `individual`: the "pull toward family extremes" it
@@ -213,11 +221,14 @@ def _add_detection_args(p: argparse.ArgumentParser, g: argparse._ArgumentGroup) 
 def _add_grouping_mod_args(g: argparse._ArgumentGroup) -> None:
     g.add_argument(
         "-c", "--combine", action="append", metavar="GROUP",
-        help='force-merge families, e.g. --combine "Font A,Font B"',
+        help='merge one group of families per flag, comma-separated inside the flag: '
+        '--combine "Font A,Font B" (repeat --combine for further, separate groups -- '
+        "don't split one group across repeats, e.g. -c A -c B merges nothing)",
     )
     g.add_argument(
-        "-i", "--ignore-prefix", action="append", metavar="TOKEN",
-        help="ignore a leading token when matching family names (e.g. Adobe, LT)",
+        "-i", "--ignore-term", action="append", metavar="TERM",
+        help="drop a whole word from family names before grouping, case-sensitive, "
+        "wherever it appears (e.g. Adobe, LT); repeatable, or comma-separated",
     )
 
 
@@ -319,14 +330,15 @@ def _build_family(subparsers: argparse._SubParsersAction) -> None:
         ("ebrium family fonts/ -r --report", "family vs per-font analysis (implies -n)"),
         ("ebrium family fonts/ -r -y", "skip the confirmation prompt"),
         ("ebrium family fonts/ --safe-max", "no clustering; safest against clipping"),
-        ("ebrium family fonts/ --ignore-prefix Adobe", "ignore a vendor prefix when grouping"),
+        ("ebrium family fonts/ --ignore-term Adobe", "drop a shared word before grouping"),
         ('ebrium family fonts/ --combine "A,B"', "force-merge two families before clustering"),
         ("ebrium family fonts/ --line-box force-baseline", "unify the typo/hhea line box"),
         ("ebrium family fonts/ --line-box-from Bold.ttf", "pin the line-box reference font"),
     ]
     notes = [
         CHECKPOINT_NOTE,
-        "--combine and --ignore-prefix still apply with --safe-max; clustering is what's skipped.",
+        COMBINE_NOTE,
+        "--combine and --ignore-term still apply with --safe-max; clustering is what's skipped.",
         "--line-box-from pins an explicit reference font; it wins over "
         "--line-box force-baseline-main-cluster when both would pick one.",
         "--line-box force-baseline (and force-baseline-main-cluster) skip single-font "
@@ -384,12 +396,13 @@ def _build_superfamily(subparsers: argparse._SubParsersAction) -> None:
         ("ebrium superfamily fonts/ -r", "merge shared-prefix families into one group"),
         ("ebrium superfamily fonts/ -r --report", "family vs per-font analysis (implies -n)"),
         ("ebrium superfamily fonts/ --exclude Mono", "keep a family out of the merge"),
-        ("ebrium superfamily fonts/ --ignore-prefix Adobe", "ignore a vendor prefix when grouping"),
+        ("ebrium superfamily fonts/ --ignore-term Adobe", "drop a shared word before grouping"),
         ('ebrium superfamily fonts/ --combine "A,B"', "force-merge two families before the prefix merge"),
         ("ebrium superfamily fonts/ --line-box force-baseline", "unify the typo/hhea line box"),
     ]
     notes = [
         CHECKPOINT_NOTE,
+        COMBINE_NOTE,
         "--exclude keeps a family out of the superfamily merge; --combine still "
         "force-merges named families first.",
         "--line-box-from pins an explicit reference font; it wins over "
@@ -536,7 +549,7 @@ def finalize_args(args: argparse.Namespace) -> None:
     args.line_box = line_box
 
     args.combine = getattr(args, "combine", None)
-    args.ignore_prefix = getattr(args, "ignore_prefix", None)
+    args.ignore_term = getattr(args, "ignore_term", None)
     args.exclude = getattr(args, "exclude", None)
     args.report = getattr(args, "report", False)
     # individual omits --max-adjustment (silent no-op there); default it so
@@ -547,7 +560,6 @@ def finalize_args(args: argparse.Namespace) -> None:
     # --assume TYPE:PATTERN (repeatable) replaces the four --assume-* flags;
     # split it back into the per-type lists measurements.py already expects,
     # so nothing downstream of finalize_args needs to know --assume exists.
-    # probe never defines --assume; getattr defaults to None there.
     buckets: dict[str, list[str]] = {t: [] for t in ASSUME_TYPES}
     for type_, pattern in getattr(args, "assume", None) or []:
         buckets[type_].append(pattern)

@@ -12,6 +12,9 @@ FontCore is vendored (console + collector + sorter + CLI help); no submodule.
 - Standalone installable package with GitHub install paths
 - Vendored FontCore subset
 - FontFixer-style `--help` (`FontCore.core_cli_help` + `ebrium.cli_parser`)
+- v3.2.0: `--ignore-prefix` → `--ignore-term` (accurate help + downstream
+  rename); `--combine` trap documented; letter-height/top-margin override
+  behavior in help
 - v3.1.0: `-a/--assume TYPE:PATTERN` replaces the four `--assume-*` flags;
   short flags `-l`/`-t`/`-c`/`-i`/`-e`/`-b`/`-a` where letters don't collide
 - v3.0.1 polish: `add_subparsers(prog=PROG)` so usage lines don't double on
@@ -34,7 +37,7 @@ FontCore is vendored (console + collector + sorter + CLI help); no submodule.
     it was always a separate tool wearing a flag.
   - `--exclude` only exists under `superfamily` now (previously a runtime
     warning: "only applies to --grouping superfamily").
-  - `--combine`/`--ignore-prefix`/`--line-box*`/`--report` only exist
+  - `--combine`/`--ignore-term`/`--line-box*`/`--report` only exist
     under `family`/`superfamily`; `individual`'s parser doesn't define
     them, so using them is an ordinary "unrecognized arguments" error
     instead of a silent no-op with a warning.
@@ -42,7 +45,7 @@ FontCore is vendored (console + collector + sorter + CLI help); no submodule.
     flag combinations (dead code once the parser itself enforces them).
   - `cli_parser.finalize_args()` still bridges the result back onto the
     attribute names the rest of the app expects (`grouping_mode`,
-    `force_baseline`, `safe_hhea`, `combine`, `ignore_prefix`, `exclude`,
+    `force_baseline`, `safe_hhea`, `combine`, `ignore_term`, `exclude`,
     `report`), defaulting the ones a given subcommand doesn't expose (e.g.
     `args.combine` is always present, `None` under `individual`/`probe`) so
     `grouping.py`/`planning.py`/`validation.py`/`cli.py` needed no other

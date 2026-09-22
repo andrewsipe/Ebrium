@@ -54,10 +54,10 @@ def validate_args(args: argparse.Namespace) -> None:
             f"≈ {estimated_span}% of UPM - extremely loose spacing"
         ).emit(console)
 
-    # Report prefix normalization when active
-    if getattr(args, "ignore_prefix", None):
+    # Report term normalization when active
+    if getattr(args, "ignore_term", None):
         cs.StatusIndicator("info").add_message(
-            f"Prefix normalization active: {', '.join(args.ignore_prefix)}"
+            f"Ignoring term(s) in family names: {', '.join(args.ignore_term)}"
         ).add_item(
             "Family names will be normalized before grouping",
             indent_level=1,

@@ -1,5 +1,22 @@
 # Changelog
 
+## [3.2.0] - 2026-09-21
+
+### Changed (breaking)
+- Renamed `--ignore-prefix` to `--ignore-term` (`-i`). The old flag described
+  stripping a "leading" token, but `FontSorter` drops a whole word
+  case-sensitively wherever it appears in the family name. `grouping.py` and
+  `validation.py` now read `args.ignore_term`.
+
+### Changed
+- `--combine` help and `family`/`superfamily` notes now state that each flag
+  is one complete merge group: `--combine "A,B"` merges A and B, but
+  `-c A -c B` creates two one-family groups (skipped with a warning), unlike
+  `-i` / `--exclude` where repeats flatten the same way.
+- `--letter-height` and `--top-margin` help document silent overrides:
+  letter-height is a floor when auto-adjust is on (default); top-margin can
+  be ignored when actual ascenders already exceed the requested margin.
+
 ## [3.1.0] - 2026-09-21
 
 ### Changed (breaking)

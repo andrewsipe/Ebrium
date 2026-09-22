@@ -55,7 +55,7 @@ def group_families(args, measures, forced_groups):
 
     # Collect ignore_terms for both family and superfamily modes
     ignore_terms_set = set(
-        expand_comma_separated_args(getattr(args, "ignore_prefix", None) or [])
+        expand_comma_separated_args(getattr(args, "ignore_term", None) or [])
     )
 
     # Conservative mode: family grouping only (no modifiers apply)
@@ -97,7 +97,7 @@ def group_families(args, measures, forced_groups):
         if normalization_summary:
             cs.emit("", console=console)
             cs.StatusIndicator("info").add_message(
-                "Family name normalization (ignored prefixes removed):"
+                "Family name normalization (ignored terms removed):"
             ).emit(console)
             for original, normalized in sorted(normalization_summary.items()):
                 cs.emit(
@@ -106,7 +106,7 @@ def group_families(args, measures, forced_groups):
                 )
 
     if args.grouping_mode == "superfamily":
-        # Superfamily mode: apply exclude modifiers (ignore-prefix handled in constructor)
+        # Superfamily mode: apply exclude modifiers (ignore-term handled in constructor)
         groups = sorter.group_by_superfamily(
             exclude_families=expand_comma_separated_args(
                 getattr(args, "exclude", None) or []

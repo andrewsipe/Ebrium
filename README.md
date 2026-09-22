@@ -1,6 +1,6 @@
 # ebrium
 
-**Version 3.1.0**
+**Version 3.2.0**
 
 Normalize vertical metrics across a font family without changing unitsPerEm or glyph outlines.
 
@@ -85,8 +85,8 @@ instead of a warning you might not notice.
 | Subcommand | What it does | Flags beyond input/preview/spacing/detection |
 |---|---|---|
 | `individual` | Normalize each font on its own; no grouping, no clustering | *(none — see below)* |
-| `family` | Group by family name, cluster within each family | `--safe-max`, `--combine`, `--ignore-prefix`, `--line-box*`, `--report` |
-| `superfamily` | Merge families sharing a name prefix, cluster across the merge | `--combine`, `--ignore-prefix`, `--exclude`, `--line-box*`, `--report` |
+| `family` | Group by family name, cluster within each family | `--safe-max`, `--combine`, `--ignore-term`, `--line-box*`, `--report` |
+| `superfamily` | Merge families sharing a name prefix, cluster across the merge | `--combine`, `--ignore-term`, `--exclude`, `--line-box*`, `--report` |
 | `probe` | Read-only MVAR/HVAR coverage report | *(none — just input + `-v`)* |
 
 `probe` used to be a `--probe-variation-metrics` flag. It never touched
@@ -104,9 +104,9 @@ subcommand now because that's what it actually is.
 
 | Flag | Meaning |
 |------|---------|
-| `-l, --letter-height PERCENT` | Target letter span (default: 130) |
-| `-t, --top-margin PERCENT` | Extra space above capitals (default: 25) |
-| `--no-auto-adjust` | Use exact `--letter-height` (no x-height tweak) |
+| `-l, --letter-height PERCENT` | Target letter span (default: 130); a **floor**, not a fixed value — auto-adjust may raise it for large x-heights (use `--no-auto-adjust` for exactly what you typed) |
+| `-t, --top-margin PERCENT` | Extra space above capitals (default: 25); ignored when a font's actual ascenders already clear it by a wide margin |
+| `--no-auto-adjust` | Use exactly `--letter-height` (skip the x-height adjustment) |
 
 **Detection overrides (filename globs, repeatable):** `-a, --assume TYPE:PATTERN` where TYPE is `script`, `decorative`, `unicase`, or `uniwidth` (e.g. `-a script:'*Swash*'`); plus `--exclude-measuring PATTERN` (excludes from family calculations rather than classifying — kept separate on purpose).
 
@@ -123,8 +123,8 @@ subcommand now because that's what it actually is.
 | Flag | Meaning |
 |------|---------|
 | `--max-adjustment PERCENT` | Cap how far family extremes may pull a font (omitted under `individual` — no multi-font pull to cap) |
-| `-c, --combine "A,B"` | Force-merge families (repeatable) |
-| `-i, --ignore-prefix TOKEN` | Ignore a leading token when matching family names (repeatable) |
+| `-c, --combine "A,B"` | Merge one group per flag, comma-separated **inside** the flag (repeat `--combine` for separate groups — `-c A -c B` does **not** merge A with B) |
+| `-i, --ignore-term TERM` | Drop a whole word from family names before grouping, case-sensitive, wherever it appears (repeatable, or comma-separated in one flag) |
 | `-e, --exclude FAMILY` | Keep a family out of the merge (**`superfamily` only**, repeatable) |
 
 **Report:** `--report` — family vs per-font analysis (implies `--dry-run`)
