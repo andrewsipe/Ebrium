@@ -1,6 +1,6 @@
 # ebrium
 
-**Version 3.0.1**
+**Version 3.1.0**
 
 Normalize vertical metrics across a font family without changing unitsPerEm or glyph outlines.
 
@@ -104,11 +104,11 @@ subcommand now because that's what it actually is.
 
 | Flag | Meaning |
 |------|---------|
-| `--letter-height PERCENT` | Target letter span (default: 130) |
-| `--top-margin PERCENT` | Extra space above capitals (default: 25) |
+| `-l, --letter-height PERCENT` | Target letter span (default: 130) |
+| `-t, --top-margin PERCENT` | Extra space above capitals (default: 25) |
 | `--no-auto-adjust` | Use exact `--letter-height` (no x-height tweak) |
 
-**Detection overrides (glob patterns, repeatable):** `--assume-script`, `--assume-decorative`, `--assume-unicase`, `--assume-uniwidth`, `--exclude-measuring`
+**Detection overrides (filename globs, repeatable):** `-a, --assume TYPE:PATTERN` where TYPE is `script`, `decorative`, `unicase`, or `uniwidth` (e.g. `-a script:'*Swash*'`); plus `--exclude-measuring PATTERN` (excludes from family calculations rather than classifying — kept separate on purpose).
 
 **General:** `-h, --help`, `--version`, `-v / -vv` (`probe`: `-v` shows per-pole deltas; repeating has no extra effect)
 
@@ -123,9 +123,9 @@ subcommand now because that's what it actually is.
 | Flag | Meaning |
 |------|---------|
 | `--max-adjustment PERCENT` | Cap how far family extremes may pull a font (omitted under `individual` — no multi-font pull to cap) |
-| `--combine "A,B"` | Force-merge families (repeatable) |
-| `--ignore-prefix TOKEN` | Ignore a leading token when matching family names (repeatable) |
-| `--exclude FAMILY` | Keep a family out of the merge (**`superfamily` only**, repeatable) |
+| `-c, --combine "A,B"` | Force-merge families (repeatable) |
+| `-i, --ignore-prefix TOKEN` | Ignore a leading token when matching family names (repeatable) |
+| `-e, --exclude FAMILY` | Keep a family out of the merge (**`superfamily` only**, repeatable) |
 
 **Report:** `--report` — family vs per-font analysis (implies `--dry-run`)
 
@@ -144,6 +144,8 @@ freely combined, and it doesn't exist under `individual` at all (single-font
 | `force-baseline` | Unify typo/hhea across the family using its largest-span style |
 | `force-baseline-main-cluster` | Like `force-baseline`, but the reference comes only from the largest optical cluster |
 | `safe-hhea` | Average existing typo/hhea across the family and apply uniformly |
+
+Short form: `-b MODE`.
 
 | Modifier | Meaning |
 |------|---------|

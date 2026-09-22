@@ -26,12 +26,12 @@ argparse "unrecognized arguments" errors instead of silent runtime warnings.
 The subcommand is required; there's no implicit default mode.
 
 finalize_args() still bridges the result back onto the attribute names
-grouping.py/planning.py/validation.py/cli.py already expect
+grouping.py/planning.py/validation.py/cli.py/measurements.py already expect
 (grouping_mode, force_baseline, force_baseline_main_cluster, safe_hhea,
-combine, ignore_prefix, exclude, report), defaulting the ones a given
-subcommand doesn't expose (e.g. args.combine is always present, None under
-`individual`/`probe`) so the rest of the app never needs to branch on
-args.mode itself.
+combine, ignore_prefix, exclude, report, assume_script/decorative/unicase/
+uniwidth), defaulting the ones a given subcommand doesn't expose (e.g.
+args.combine is always present, None under `individual`/`probe`) so the
+rest of the app never needs to branch on args.mode itself.
 
 In cli.py:
 
@@ -65,6 +65,29 @@ PROG = "ebrium"
 DOCS_URL = "https://github.com/andrewsipe/ebrium"
 FORMATS_LINE = "TTF, OTF, WOFF, WOFF2 (.ttx with --use-ttx)"
 
+ASSUME_TYPES = {
+    "script": "treat as a script/handwriting face",
+    "decorative": "treat as a decorative/display face",
+    "unicase": "treat as unicase (no separate cap-height row)",
+    "uniwidth": "treat as fixed-advance-width across the family (one match flags the whole family)",
+}
+
+
+def _assume_value(raw: str) -> tuple[str, str]:
+    """argparse `type=` for `--assume TYPE:PATTERN`. Raising ArgumentTypeError
+    here gives a normal argparse usage error instead of a silent no-op --
+    same reasoning as splitting the flags into subcommands in the first place."""
+    type_, sep, pattern = raw.partition(":")
+    if not sep or not pattern:
+        raise argparse.ArgumentTypeError(
+            f"expected TYPE:PATTERN, e.g. script:*Swash* (got {raw!r})"
+        )
+    if type_ not in ASSUME_TYPES:
+        choices = ", ".join(ASSUME_TYPES)
+        raise argparse.ArgumentTypeError(f"unknown type {type_!r} (choose from {choices})")
+    return type_, pattern
+
+
 MODE_SUMMARY = {
     "individual": "normalize each font on its own; no grouping or clustering",
     "family": "group by family name; cluster within each family (add --safe-max to skip clustering)",
@@ -75,7 +98,8 @@ MODE_SUMMARY = {
 # Coupled to the inline={"line box (typo / hhea)": ...} placement in
 # _build_family/_build_superfamily: the --line-box help string says
 # "see modes below" because this table prints immediately after that
-# group. If the table ever moves to the footer, update that help string.
+# group. Same for ASSUME_TYPES under "detection overrides...". If either
+# table moves to the footer, update the matching help string.
 LINE_BOX_MODES = {
     "auto": "each font keeps its own planned typo/hhea values (default)",
     "force-baseline": "unify typo/hhea across the family using its largest-span style "
@@ -143,22 +167,20 @@ def _add_report_arg(g: argparse._ArgumentGroup) -> None:
     )
 
 
-def _add_spacing_args(
-    g: argparse._ArgumentGroup, *, include_max_adjustment: bool = True
-) -> None:
+def _add_spacing_args(g: argparse._ArgumentGroup, *, include_max_adjustment: bool = True) -> None:
     g.add_argument(
-        "--letter-height", type=float, default=130, metavar="PERCENT",
+        "-l", "--letter-height", type=float, default=130, metavar="PERCENT",
         help="target height of the letter span (default: 130)",
     )
     g.add_argument(
-        "--top-margin", type=float, default=25, metavar="PERCENT",
+        "-t", "--top-margin", type=float, default=25, metavar="PERCENT",
         help="extra space above capitals (default: 25)",
     )
-    # --max-adjustment only does anything when a multi-font cluster can pull
-    # a member font; individual mode always plans one font at a time, so the
-    # pull check never fires (planning.py plan_identical_metrics). Omit it
-    # there rather than accept a silent no-op.
     if include_max_adjustment:
+        # Meaningless under `individual`: the "pull toward family extremes" it
+        # caps never happens when every font is its own group of one, so this
+        # subcommand's callers pass include_max_adjustment=False rather than
+        # exposing a flag that silently does nothing.
         g.add_argument(
             "--max-adjustment", type=float, default=None, metavar="PERCENT",
             help="cap how far family extremes may pull a font (default: no cap); "
@@ -172,20 +194,10 @@ def _add_spacing_args(
 
 def _add_detection_args(p: argparse.ArgumentParser, g: argparse._ArgumentGroup) -> None:
     g.add_argument(
-        "--assume-script", action="append", metavar="PATTERN",
-        help="treat matching fonts as script (e.g. '*Script*', '*Swash*')",
-    )
-    g.add_argument(
-        "--assume-decorative", action="append", metavar="PATTERN",
-        help="treat matching fonts as decorative (e.g. '*Rough*', '*Inline*')",
-    )
-    g.add_argument(
-        "--assume-unicase", action="append", metavar="PATTERN",
-        help="treat matching fonts as unicase (e.g. '*Unicase*')",
-    )
-    g.add_argument(
-        "--assume-uniwidth", action="append", metavar="PATTERN",
-        help="treat matching fonts as uniwidth; one match flags the whole family",
+        "-a", "--assume", dest="assume", action="append", type=_assume_value,
+        metavar="TYPE:PATTERN",
+        help="override detection for matching filenames, repeatable "
+        "(TYPE: script, decorative, unicase, uniwidth; see table below)",
     )
     g.add_argument(
         "--exclude-measuring", action="append", metavar="PATTERN",
@@ -200,18 +212,18 @@ def _add_detection_args(p: argparse.ArgumentParser, g: argparse._ArgumentGroup) 
 
 def _add_grouping_mod_args(g: argparse._ArgumentGroup) -> None:
     g.add_argument(
-        "--combine", action="append", metavar="GROUP",
+        "-c", "--combine", action="append", metavar="GROUP",
         help='force-merge families, e.g. --combine "Font A,Font B"',
     )
     g.add_argument(
-        "--ignore-prefix", action="append", metavar="TOKEN",
+        "-i", "--ignore-prefix", action="append", metavar="TOKEN",
         help="ignore a leading token when matching family names (e.g. Adobe, LT)",
     )
 
 
 def _add_line_box_args(g: argparse._ArgumentGroup) -> None:
     g.add_argument(
-        "--line-box", dest="line_box", default="auto",
+        "-b", "--line-box", dest="line_box", default="auto",
         choices=["auto", "force-baseline", "force-baseline-main-cluster", "safe-hhea"],
         metavar="MODE",
         help="how typo/hhea is set across the group (default: auto; see modes below)",
@@ -261,13 +273,14 @@ def _build_individual(subparsers: argparse._SubParsersAction) -> None:
         ("ebrium individual fonts/ -r", "normalize each font on its own (asks before writing)"),
         ("ebrium individual fonts/ -r -n", "preview the changes"),
         ("ebrium individual fonts/ -r -y", "skip the confirmation prompt"),
-        ("ebrium individual fonts/ --assume-script '*Swash*'", "override script detection by filename"),
+        ("ebrium individual fonts/ -a script:'*Swash*'", "override script detection by filename"),
     ]
     notes = [CHECKPOINT_NOTE]
 
     _add_help(
         g_gen,
         panel=safety_panel(message=PANEL_MESSAGE, rows=PANEL_ROWS_BASIC),
+        inline={"detection overrides (filename globs, repeatable)": choices_section("--assume types", ASSUME_TYPES)},
         footer=[
             examples_section(examples),
             notes_section(notes),
@@ -323,7 +336,12 @@ def _build_family(subparsers: argparse._SubParsersAction) -> None:
     _add_help(
         g_gen,
         panel=safety_panel(message=PANEL_MESSAGE, rows=PANEL_ROWS_WITH_REPORT),
-        inline={"line box (typo / hhea)": choices_section("--line-box modes", LINE_BOX_MODES)},
+        inline={
+            "line box (typo / hhea)": choices_section("--line-box modes", LINE_BOX_MODES),
+            "detection overrides (filename globs, repeatable)": choices_section(
+                "--assume types", ASSUME_TYPES
+            ),
+        },
         footer=[
             examples_section(examples),
             notes_section(notes),
@@ -383,7 +401,12 @@ def _build_superfamily(subparsers: argparse._SubParsersAction) -> None:
     _add_help(
         g_gen,
         panel=safety_panel(message=PANEL_MESSAGE, rows=PANEL_ROWS_WITH_REPORT),
-        inline={"line box (typo / hhea)": choices_section("--line-box modes", LINE_BOX_MODES)},
+        inline={
+            "line box (typo / hhea)": choices_section("--line-box modes", LINE_BOX_MODES),
+            "detection overrides (filename globs, repeatable)": choices_section(
+                "--assume types", ASSUME_TYPES
+            ),
+        },
         footer=[
             examples_section(examples),
             notes_section(notes),
@@ -399,7 +422,7 @@ def _build_superfamily(subparsers: argparse._SubParsersAction) -> None:
     _add_spacing_args(g_space)
     _add_grouping_mod_args(g_mod)
     g_mod.add_argument(
-        "--exclude", action="append", metavar="FAMILY",
+        "-e", "--exclude", action="append", metavar="FAMILY",
         help="keep FAMILY out of the superfamily merge",
     )
     _add_line_box_args(g_box)
@@ -465,13 +488,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     g_gen.add_argument("--version", action="version", version=f"{PROG} {__version__}")
 
-    # prog=PROG keeps each subparser's %(prog)s as "ebrium <name>". Without
-    # it, older argparse (pre-3.14) builds the subparser prog from the
-    # parent's custom usage= string, so usage lines double:
-    # "ebrium {individual,...} [options] [PATH ...] individual [options]..."
     subparsers = p.add_subparsers(
         dest="mode", metavar="MODE", required=True,
-        prog=PROG,
+        prog=PROG,  # otherwise each subparser's prog becomes this parser's whole
+                    # custom usage= string, doubling the usage line under -h
         help="grouping subcommand; see 'subcommands' below",
     )
     _build_individual(subparsers)
@@ -523,3 +543,15 @@ def finalize_args(args: argparse.Namespace) -> None:
     # cli.py's MetricsConfig construction never AttributeErrors.
     if not hasattr(args, "max_adjustment"):
         args.max_adjustment = None
+
+    # --assume TYPE:PATTERN (repeatable) replaces the four --assume-* flags;
+    # split it back into the per-type lists measurements.py already expects,
+    # so nothing downstream of finalize_args needs to know --assume exists.
+    # probe never defines --assume; getattr defaults to None there.
+    buckets: dict[str, list[str]] = {t: [] for t in ASSUME_TYPES}
+    for type_, pattern in getattr(args, "assume", None) or []:
+        buckets[type_].append(pattern)
+    args.assume_script = buckets["script"] or None
+    args.assume_decorative = buckets["decorative"] or None
+    args.assume_unicase = buckets["unicase"] or None
+    args.assume_uniwidth = buckets["uniwidth"] or None

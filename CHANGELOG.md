@@ -1,5 +1,22 @@
 # Changelog
 
+## [3.1.0] - 2026-09-21
+
+### Changed (breaking)
+- Consolidated `--assume-script` / `--assume-decorative` / `--assume-unicase` /
+  `--assume-uniwidth` into one repeatable flag:
+  `-a, --assume TYPE:PATTERN` (e.g. `-a script:'*Swash*'`). A font can still
+  match more than one type (script and decorative aren't exclusive), so this
+  stays append-style rather than a single-choice flag. Bad types are argparse
+  errors. `--exclude-measuring` stays separate — it excludes from calculations
+  rather than classifying. `finalize_args` splits `--assume` back into the
+  four list attributes `measurements.py` already expects.
+- Added short flags where a letter means the same thing in every subcommand
+  that exposes it: `-l`/`-t`/`-c`/`-i`/`-e`/`-b`/`-a` for `--letter-height`,
+  `--top-margin`, `--combine`, `--ignore-prefix`, `--exclude`, `--line-box`,
+  `--assume`. Left long-only: `--max-adjustment`, `--safe-max`,
+  `--no-auto-adjust`, `--use-ttx`, `--line-box-from`.
+
 ## [3.0.1] - 2026-09-21
 
 ### Fixed
