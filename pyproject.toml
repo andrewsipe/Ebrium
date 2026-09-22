@@ -20,6 +20,7 @@ dependencies = [
 
 [project.urls]
 Homepage = "https://github.com/andrewsipe/ebrium"
+Documentation = "https://andrewsipe.github.io/ebrium/"
 Repository = "https://github.com/andrewsipe/ebrium"
 
 [project.scripts]

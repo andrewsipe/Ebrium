@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Flags · ebrium</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Sora:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="site-header-inner">
+      <a class="brand" href="index.html">ebrium <span>docs</span></a>
+      <nav class="nav" aria-label="Primary">
+        <a href="index.html">Home</a>
+        <a href="concepts.html">Concepts</a>
+        <a href="logic.html">How it thinks</a>
+        <a href="flags.html" aria-current="page">Flags</a>
+        <a href="report.html">Report lookup</a>
+      </nav>
+      <a class="github-link" href="https://github.com/andrewsipe/ebrium">GitHub</a>
+    </div>
+  </header>
+
+  <main class="wide">
+    <p class="meta">Reference</p>
+    <h1>Flag reference</h1>
+    <p class="lede">Each subcommand only defines flags that do something for it. Invalid combinations are argparse errors, not silent warnings. Live wording: <code>ebrium &lt;subcommand&gt; --help</code>.</p>
+
+    <h2>Who gets what</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Subcommand</th>
+          <th>Beyond shared input / preview / spacing / detection</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>individual</code></td>
+          <td>No clustering or report flags; no <code>--max-adjustment</code></td>
+        </tr>
+        <tr>
+          <td><code>family</code></td>
+          <td><code>--safe-max</code>, <code>--combine</code>, <code>--ignore-term</code>, <code>--line-box*</code>, <code>--report</code>, <code>--max-adjustment</code></td>
+        </tr>
+        <tr>
+          <td><code>superfamily</code></td>
+          <td>Same as family except <code>--safe-max</code>; plus <code>--exclude</code></td>
+        </tr>
+        <tr>
+          <td><code>probe</code></td>
+          <td>Input + <code>-v</code> only (per-pole deltas)</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>Shared (individual / family / superfamily)</h2>
+    <table>
+      <thead>
+        <tr><th>Flag</th><th>Meaning</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>PATH…</code></td><td>Font files or directories (default: current directory)</td></tr>
+        <tr><td><code>-r, --recursive</code></td><td>Recurse into directories</td></tr>
+        <tr><td><code>--use-ttx</code></td><td>Also process <code>.ttx</code> files</td></tr>
+        <tr><td><code>-n, --dry-run</code></td><td>Preview without writing</td></tr>
+        <tr><td><code>-y, --yes</code></td><td>Skip confirmation prompt</td></tr>
+        <tr><td><code>-l, --letter-height %</code></td><td>Letter-span floor (default 130); auto-adjust may raise it</td></tr>
+        <tr><td><code>-t, --top-margin %</code></td><td>Headroom above caps (default 25); may be ignored if already clear</td></tr>
+        <tr><td><code>--no-auto-adjust</code></td><td>Use exact <code>--letter-height</code></td></tr>
+        <tr><td><code>-a, --assume TYPE:PATTERN</code></td><td>Force classify: <code>script</code>, <code>decorative</code>, <code>unicase</code>, <code>uniwidth</code> (repeatable)</td></tr>
+        <tr><td><code>--exclude-measuring PATTERN</code></td><td>Exclude from family calculations (not a classify flag)</td></tr>
+        <tr><td><code>-v / -vv</code></td><td>Verbosity (<code>probe</code>: <code>-v</code> only; repeating does nothing extra)</td></tr>
+      </tbody>
+    </table>
+
+    <h2>family only</h2>
+    <table>
+      <thead>
+        <tr><th>Flag</th><th>Meaning</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>--safe-max</code></td>
+          <td>Skip clustering; bbox extremes for every font. Advanced — for unpredictable / mis-detected metrics. Default is to cluster.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>family and superfamily</h2>
+    <table>
+      <thead>
+        <tr><th>Flag</th><th>Meaning</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>--max-adjustment %</code></td><td>Cap how far family extremes may pull a font</td></tr>
+        <tr>
+          <td><code>-c, --combine "A,B"</code></td>
+          <td>One complete merge group per flag. Repeat <code>--combine</code> for separate groups. <code>-c A -c B</code> does <strong>not</strong> merge A with B.</td>
+        </tr>
+        <tr>
+          <td><code>-i, --ignore-term TERM</code></td>
+          <td>Drop a whole word from family names before grouping (case-sensitive, anywhere; repeatable or comma-separated)</td>
+        </tr>
+        <tr><td><code>-e, --exclude FAMILY</code></td><td><code>superfamily</code> only — keep a family out of the merge</td></tr>
+        <tr><td><code>--report</code></td><td>Family vs per-font analysis (implies <code>-n</code>)</td></tr>
+        <tr>
+          <td><code>-b, --line-box MODE</code></td>
+          <td><code>auto</code> | <code>force-baseline</code> | <code>force-baseline-main-cluster</code> | <code>safe-hhea</code></td>
+        </tr>
+        <tr>
+          <td><code>--line-box-from PATH_OR_GLOB</code></td>
+          <td>Pin reference font; implies <code>force-baseline</code> if mode left at <code>auto</code></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout">
+      <strong>Abbreviation trap.</strong> Parsers set <code>allow_abbrev=False</code>, so <code>--exclude</code> under <code>individual</code> errors instead of silently matching <code>--exclude-measuring</code>.
+    </div>
+
+    <h2>Recipes</h2>
+    <pre><code># Preview family plan
+ebrium family fonts/ -r -n
+
+# Impact report before writing
+ebrium family fonts/ -r --report
+
+# Unpredictable metrics: skip clustering
+ebrium family fonts/ -r --safe-max
+
+# Force two families into one group before clustering
+ebrium family fonts/ -r --combine "Display,DisplayAlt"
+
+# Unify line box from the main optical cluster
+ebrium family fonts/ -r -b force-baseline-main-cluster
+
+# Superfamily, leave one family alone
+ebrium superfamily fonts/ -r -e "SpecialSans"</code></pre>
+  </main>
+
+  <footer class="site-footer">
+    <a href="logic.html">← How it thinks</a>
+    · <a href="report.html">Report lookup →</a>
+  </footer>
+</body>
+</html>

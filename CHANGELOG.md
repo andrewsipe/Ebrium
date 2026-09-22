@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- Static docs site under `docs/` for GitHub Pages (concepts, how it thinks,
+  flag reference, `--report` lookup). README slimmed to install + quick start
+  with a Docs link; `project.urls.Documentation` and CLI `DOCS_URL` point at
+  https://andrewsipe.github.io/ebrium/
+
 ## [3.2.2] - 2026-09-21
 
 ### Changed

@@ -62,7 +62,7 @@ from FontCore.core_console_styles import get_console
 from . import __version__
 
 PROG = "ebrium"
-DOCS_URL = "https://github.com/andrewsipe/ebrium"
+DOCS_URL = "https://andrewsipe.github.io/ebrium/"
 FORMATS_LINE = "TTF, OTF, WOFF, WOFF2 (.ttx with --use-ttx)"
 
 ASSUME_TYPES = {

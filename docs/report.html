@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Report lookup · ebrium</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Sora:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="site-header-inner">
+      <a class="brand" href="index.html">ebrium <span>docs</span></a>
+      <nav class="nav" aria-label="Primary">
+        <a href="index.html">Home</a>
+        <a href="concepts.html">Concepts</a>
+        <a href="logic.html">How it thinks</a>
+        <a href="flags.html">Flags</a>
+        <a href="report.html" aria-current="page">Report lookup</a>
+      </nav>
+      <a class="github-link" href="https://github.com/andrewsipe/ebrium">GitHub</a>
+    </div>
+  </header>
+
+  <main>
+    <p class="meta">--report</p>
+    <h1>Report lookup</h1>
+    <p class="lede">
+      <code>ebrium family … --report</code> (or <code>superfamily</code>) prints a dry-run impact analysis: how much each style’s planned ascender differs from what it would get alone. Implies <code>-n</code> — nothing is written to the fonts (a checkpoint file may still be written).
+    </p>
+
+    <h2>Sample shape</h2>
+    <div class="report-sample" aria-label="Example report output"><span class="hi">Family Normalization Impact Report</span>
+
+Font Sans (3 fonts)
+
+  Family ascender: 0.8200 (normalized)
+  Driven by: Sans-Black.ttf (asc: 820)
+
+  <span class="warn-line">↑ Sans-Regular.ttf    +  70 units (+8.5%) - pulled up by family</span>
+  <span class="warn-line">↑ Sans-Bold.ttf       +  50 units (+6.5%) - pulled up by family</span>
+  <span class="ok">✓ Sans-Black.ttf      ±   0 units (+0.0%) - minimal impact</span>
+
+  <span class="warn-line">High normalization impact detected (8.5% max adjustment)</span>
+      Consider the individual subcommand for heavily affected fonts
+      Or use --max-adjustment 6.8 to limit adjustment</div>
+
+    <h2>Line by line</h2>
+    <table>
+      <thead>
+        <tr><th>You see</th><th>It means</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="term">Family ascender: N (normalized)</span></td>
+          <td>Family-wide planned ascender as a fraction of UPM (same plan, scaled per font later).</td>
+        </tr>
+        <tr>
+          <td><span class="term">Driven by: file (asc: …)</span></td>
+          <td>The style with the tallest ascenders — usually the one setting the family ceiling.</td>
+        </tr>
+        <tr>
+          <td><code>↑</code> … pulled up by family</td>
+          <td>This font’s solo plan is shorter; sharing the family plan raises its ascender (units and %).</td>
+        </tr>
+        <tr>
+          <td><code>↓</code> … pulled down by family</td>
+          <td>Rare: family plan is shorter than the font’s solo plan.</td>
+        </tr>
+        <tr>
+          <td><code>✓</code> … minimal impact</td>
+          <td>Absolute change under ~1% — effectively the driver or already aligned.</td>
+        </tr>
+        <tr>
+          <td>High normalization impact…</td>
+          <td>Max |pull| over 8%. Suggestions: run <code>individual</code> for outliers, or lower <code>--max-adjustment</code>.</td>
+        </tr>
+        <tr>
+          <td>Uniwidth families</td>
+          <td>Summary of families flagged as fixed-advance; normalization reinforces that intent.</td>
+        </tr>
+        <tr>
+          <td>single-font families skipped</td>
+          <td>No pull analysis when there’s only one font in the group.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>What to do next</h2>
+    <ul>
+      <li><strong>Pulls look fine</strong> — drop <code>--report</code> and run with <code>-y</code> if you’re ready, or leave the prompt on.</li>
+      <li><strong>One style is dragged hard</strong> — process it with <code>individual</code>, or exclude it from measuring / combine differently.</li>
+      <li><strong>Whole family too aggressive</strong> — tighten <code>--max-adjustment</code>, or inspect clustering with/without <code>--safe-max</code>.</li>
+      <li><strong>Names grouped wrong</strong> — <code>--ignore-term</code>, <code>--combine</code>, or switch to <code>superfamily</code> / <code>--exclude</code>.</li>
+    </ul>
+
+    <div class="callout">
+      <strong>Not the same as the change preview.</strong> The normal dry-run lists planned metric writes. <code>--report</code> specifically compares family vs solo ascender impact. Use both when diagnosing a surprising plan.
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <a href="flags.html">← Flags</a>
+    · <a href="index.html">Home</a>
+  </footer>
+</body>
+</html>

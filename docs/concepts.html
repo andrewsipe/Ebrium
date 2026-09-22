@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Concepts · ebrium</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Sora:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="site-header-inner">
+      <a class="brand" href="index.html">ebrium <span>docs</span></a>
+      <nav class="nav" aria-label="Primary">
+        <a href="index.html">Home</a>
+        <a href="concepts.html" aria-current="page">Concepts</a>
+        <a href="logic.html">How it thinks</a>
+        <a href="flags.html">Flags</a>
+        <a href="report.html">Report lookup</a>
+      </nav>
+      <a class="github-link" href="https://github.com/andrewsipe/ebrium">GitHub</a>
+    </div>
+  </header>
+
+  <main>
+    <p class="meta">Vocabulary</p>
+    <h1>Concepts</h1>
+    <p class="lede">Terms you’ll see in the CLI, the report, and the planned metrics. Skim once; come back when a flag name stops making sense.</p>
+
+    <h2>Cap height (optical)</h2>
+    <p>The measured height of capital letters used as the <strong>stable anchor</strong> for clustering. Styles that share an optical size should share cap height even when x-height drifts (optical sizes) or names differ. Clustering always prefers optical cap measurement over table values that may be wrong or stale.</p>
+
+    <h2>Cluster</h2>
+    <p>A set of fonts treated as optically identical: same planned typo/hhea after normalization (scaled per UPM). Cap height is primary; x-height and descenders are checked more loosely; a large overall bbox span ratio can keep two fonts out of the same cluster (scripts / decorative faces).</p>
+    <p>Under <code>family</code>, clustering is the default. <code>--safe-max</code> skips it and uses bbox extremes for every font — an advanced opt-out when metrics are unpredictable or mis-detected.</p>
+
+    <h2>Typo / hhea vs Win</h2>
+    <ul>
+      <li><span class="term">typoAscender / typoDescender / typoLineGap</span> (OS/2) and matching <span class="term">hhea</span> values define the line box many apps use when <code>USE_TYPO_METRICS</code> is on (OS/2 v4+).</li>
+      <li><span class="term">usWinAscent / usWinDescent</span> are clipping bounds. Family-wide Win uses normalized extremes so nothing clips; decorative outliers can expand Win while still inheriting typo from the core cluster.</li>
+      <li>Line gaps are set to <strong>zero</strong> across typo and hhea.</li>
+    </ul>
+
+    <h2>Letter height &amp; top margin</h2>
+    <p><code>--letter-height</code> (default 130% of UPM) is a <strong>floor</strong> for the letter span when auto-adjust is on — large x-heights may raise it. <code>--top-margin</code> (default 25%) asks for headroom above capitals; it can be ignored when actual ascenders already clear it. Use <code>--no-auto-adjust</code> for exactly the percentages you typed.</p>
+
+    <h2>Family pull</h2>
+    <p>When several fonts share a family plan, a style with smaller solo ascenders can be <em>pulled up</em> toward the family driver. That’s intentional for a shared line box. <code>--report</code> quantifies it; <code>--max-adjustment</code> caps it; <code>individual</code> avoids it entirely.</p>
+
+    <h2>Detection labels</h2>
+    <p>Filename (or measurement) heuristics can mark fonts as script, decorative, unicase, or uniwidth. Override with <code>-a/--assume TYPE:PATTERN</code>. <code>--exclude-measuring</code> keeps a font out of family calculations without classifying it — different job, different flag.</p>
+
+    <h2>Superfamily</h2>
+    <p>Families whose names share a prefix can be merged into one planning unit (<code>superfamily</code>). Use <code>--exclude</code> to keep a family out of that merge, and <code>--combine</code> / <code>--ignore-term</code> when names don’t group the way you want.</p>
+
+    <h2>Checkpoint</h2>
+    <p>Every measuring run (including <code>-n</code> / <code>--report</code>) writes <code>.metrics_checkpoint.json</code> in the <strong>current working directory</strong>. It caches measurements and clusters and resets when options or the font set change. <code>probe</code> never measures, so it never writes one.</p>
+  </main>
+
+  <footer class="site-footer">
+    <a href="index.html">← Home</a>
+    · <a href="logic.html">How it thinks →</a>
+  </footer>
+</body>
+</html>

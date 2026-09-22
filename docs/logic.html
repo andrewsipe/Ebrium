@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>How it thinks · ebrium</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Sora:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="site-header-inner">
+      <a class="brand" href="index.html">ebrium <span>docs</span></a>
+      <nav class="nav" aria-label="Primary">
+        <a href="index.html">Home</a>
+        <a href="concepts.html">Concepts</a>
+        <a href="logic.html" aria-current="page">How it thinks</a>
+        <a href="flags.html">Flags</a>
+        <a href="report.html">Report lookup</a>
+      </nav>
+      <a class="github-link" href="https://github.com/andrewsipe/ebrium">GitHub</a>
+    </div>
+  </header>
+
+  <main>
+    <p class="meta">Pipeline</p>
+    <h1>How it thinks</h1>
+    <p class="lede">The subcommand picks the grouping strategy. Everything after that follows the same four stages.</p>
+
+    <ol class="steps">
+      <li>
+        <span class="term">Measure</span>
+        Cap height (optical), x-height, ascenders, descenders, glyph bounds — normalized by each font’s UPM so mixed masters compare fairly.
+      </li>
+      <li>
+        <span class="term">Cluster</span>
+        Optically identical styles share a core plan. Outliers (decorative / script span, mis-detected metrics) can sit outside the main cluster. Skipped entirely under <code>individual</code> and under <code>family --safe-max</code>.
+      </li>
+      <li>
+        <span class="term">Plan</span>
+        Build typo/hhea for the core cluster; set Win from family extremes; optionally unify the line box (<code>--line-box</code>); apply letter-height / top-margin floors and <code>--max-adjustment</code> caps.
+      </li>
+      <li>
+        <span class="term">Apply</span>
+        Write metrics in place (unless <code>-n</code> / <code>--report</code>). Enable <code>USE_TYPO_METRICS</code> when OS/2 ≥ 4. Zero line gaps.
+      </li>
+    </ol>
+
+    <h2>Grouping strategies</h2>
+    <table>
+      <thead>
+        <tr><th>Subcommand</th><th>Grouping</th><th>Clustering</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>individual</code></td>
+          <td>None — one font at a time</td>
+          <td>No</td>
+        </tr>
+        <tr>
+          <td><code>family</code></td>
+          <td>By family name</td>
+          <td>Yes (default); off with <code>--safe-max</code></td>
+        </tr>
+        <tr>
+          <td><code>superfamily</code></td>
+          <td>Merge families sharing a name prefix</td>
+          <td>Yes, across the merge</td>
+        </tr>
+        <tr>
+          <td><code>probe</code></td>
+          <td>—</td>
+          <td>No measure / plan / write — MVAR/HVAR only</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>Line box modes</h2>
+    <p>Under <code>family</code> / <code>superfamily</code>, <code>--line-box</code> controls typo/hhea unification (Win still uses max ranges where that mode says so):</p>
+    <table>
+      <thead>
+        <tr><th>Mode</th><th>Behavior</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>auto</code></td><td>Each font keeps its own planned typo/hhea (default)</td></tr>
+        <tr><td><code>force-baseline</code></td><td>Unify using the family’s largest-span style</td></tr>
+        <tr><td><code>force-baseline-main-cluster</code></td><td>Same, but reference comes only from the largest optical cluster</td></tr>
+        <tr><td><code>safe-hhea</code></td><td>Average existing typo/hhea across the family; apply uniformly</td></tr>
+      </tbody>
+    </table>
+    <p><code>--line-box-from PATH_OR_GLOB</code> pins the reference font and implies <code>force-baseline</code> if you left the mode at <code>auto</code>. Single-font “families” skip force-baseline (nothing to unify).</p>
+
+    <h2>What stays untouched</h2>
+    <ul>
+      <li><code>unitsPerEm</code></li>
+      <li>Glyph outlines and advances</li>
+      <li>Name tables (use FontNameID for those)</li>
+    </ul>
+
+    <div class="callout">
+      <strong>Exit codes.</strong> <code>0</code> done (including dry-run / nothing to change); <code>1</code> no font files; <code>2</code> no measurable fonts <em>or</em> bad args; <code>3</code> aborted at confirmation. <code>probe</code> only uses 0 / 1 / 2.
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <a href="concepts.html">← Concepts</a>
+    · <a href="flags.html">Flags →</a>
+  </footer>
+</body>
+</html>

@@ -101,6 +101,16 @@ FontCore is vendored (console + collector + sorter + CLI help); no submodule.
   (`probe` doesn't measure at all, so it never writes one)
 - Exit code `2` is used both for “no measurable fonts” and by argparse for bad args
 
+## Docs site
+
+Static Pages site in `docs/` (concepts, logic, flags, report lookup). README is the
+product front door; advanced detail lives on the site.
+
+Enable once on GitHub: **Settings → Pages → Deploy from a branch → `main` / `/docs`**.
+URL: https://andrewsipe.github.io/ebrium/
+
+Optional: set the repo About “Website” field to that URL.
+
 ## Deferred
 
 1. Optional: skip checkpoint writes in dry-run / report / probe modes
