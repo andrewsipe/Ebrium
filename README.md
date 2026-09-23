@@ -8,7 +8,7 @@ Formerly **FontMetricsNormalizer**. The public name and CLI are **ebrium**.
 
 Typical pipeline: naming cleanup ([FontNameID](https://github.com/andrewsipe/FontNameID)) → structural tidy ([FontFixer](https://github.com/andrewsipe/FontFixer)) → **ebrium**.
 
-**Docs:** [Concepts, flags, and report lookup](https://andrewsipe.github.io/ebrium/) · full flag detail also in `ebrium <subcommand> --help`
+**Docs:** [Line box, reading a run, flags, and report lookup](https://andrewsipe.github.io/ebrium/) · full flag detail also in `ebrium <subcommand> --help`
 
 ## Install
 
@@ -61,7 +61,7 @@ By default, matching fonts are **modified in place** (no backup). Use `-n` or `-
 
 Decorative outliers can inherit typo metrics while expanding Win bounds. Line gaps go to zero; `USE_TYPO_METRICS` is set when OS/2 version ≥ 4.
 
-For definitions, clustering logic, every flag, and how to read `--report`, use the [doc site](https://andrewsipe.github.io/ebrium/).
+For the line-box picture, how to read a run, clustering logic, every flag, and `--report`, use the [doc site](https://andrewsipe.github.io/ebrium/).
 
 ## Related
 

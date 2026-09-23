@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Reading a run · ebrium</title>
+  <meta name="description" content="What an ebrium terminal run is saying, walked through with the same line-box example as Concepts." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Sora:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="site-header-inner">
+      <a class="brand" href="index.html">ebrium <span>docs</span></a>
+      <nav class="nav" aria-label="Primary">
+        <a href="index.html">Home</a>
+        <a href="concepts.html">Concepts</a>
+        <a href="logic.html">How it thinks</a>
+        <a href="flags.html">Flags</a>
+        <a href="terminal.html" aria-current="page">Terminal</a>
+        <a href="report.html">Report lookup</a>
+      </nav>
+      <a class="github-link" href="https://github.com/andrewsipe/ebrium">GitHub</a>
+    </div>
+  </header>
+
+  <main>
+    <p class="meta">Terminal</p>
+    <h1>Reading a run</h1>
+    <p class="lede">A normal run measures the fonts, prints a plan, asks before it writes, then lists what changed in each file. The sample below is the <a href="concepts.html#line-box">line box drawing</a>: an em of 1000, two styles, one shared box.</p>
+
+    <!-- Specimen: em 1000, Source Serif 4. Before 720 / 180 / gap 280. After 960 / 300 / gap 0. Keep in sync with concepts.html. -->
+    <figure class="linebox" id="line-box">
+      <div class="linebox-panels">
+        <div class="linebox-panel">
+          <p class="meta">Before</p>
+          <h3>Clips, with a wide gap</h3>
+          <div class="stack before">
+            <div class="ln"><span>Happy dogs play</span></div>
+            <div class="band">line gap</div>
+            <div class="ln"><span>in the garden</span></div>
+            <div class="band">line gap</div>
+            <div class="ln"><span>at dusk.</span></div>
+            <div class="measure">1450<small>baselines</small></div>
+          </div>
+          <ul class="linebox-nums">
+            <li><span>Above baseline</span>750</li>
+            <li><span>Below baseline</span>100</li>
+            <li><span>Line gap</span>600</li>
+          </ul>
+        </div>
+        <div class="linebox-panel">
+          <p class="meta">After</p>
+          <h3>Default: 1300, no gap</h3>
+          <div class="stack after">
+            <div class="ln"><span>Happy dogs play</span></div>
+            <div class="ln"><span>in the garden</span></div>
+            <div class="ln"><span>at dusk.</span></div>
+            <div class="measure">1300<small>baselines</small></div>
+          </div>
+          <ul class="linebox-nums">
+            <li><span>Above baseline</span>920</li>
+            <li><span>Below baseline</span>380</li>
+            <li><span>Line gap</span>0</li>
+          </ul>
+        </div>
+      </div>
+      <ul class="linebox-key">
+        <li><i class="swatch box" aria-hidden="true"></i>Line box</li>
+        <li><i class="swatch gap" aria-hidden="true"></i>Line gap</li>
+        <li><i class="swatch ghost" aria-hidden="true"></i>Previous box</li>
+        <li><i class="swatch base" aria-hidden="true"></i>Baseline</li>
+      </ul>
+      <figcaption>
+        A default run. The line box becomes 1300 units tall — 130% of the em — and the line gap becomes 0, so the baselines are 1300 apart. Above-baseline 750 becomes 920. Below-baseline 100 becomes 380, which is what stops the descenders hanging out of the box.
+      </figcaption>
+    </figure>
+
+    <h2 id="sample">A normal run</h2>
+    <p>Nothing here uses <code>-v</code>. The progress bar is only the measuring step. Files stay untouched until you answer the prompt.</p>
+    <div class="report-sample wrap" aria-label="Example terminal output"><span class="hi"> INFO</span>       Measuring 2 file(s) for bounds and metrics
+  Measuring fonts... ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 0:00:00
+
+<span class="hi"> INFO</span>       Found 1 family group(s)
+
+<span class="hi"> INFO</span>       Family: 'Example' — Core cluster: 2 fonts | UPM: 1000
+<span class="hi"> INFO</span>       Family: Example (2 fonts) — Major Normalization
+<span class="warn-line"> MAJOR</span>      UPM scaled by ~45.0%, increasing vertical height by 52.9% | linegap set to 0
+
+<span class="hi"> INPUT</span>      About to modify 2 file(s). Proceed? [y/N]: y
+
+<span class="ok"> UPDATED</span>    /path/to/fonts/Example-Regular.otf
+OS/2 table:
+            usWinAscent: 760 → 920
+            usWinDescent: 120 → 380
+            sTypoAscender: 750 → 920
+            sTypoDescender: -100 → -380
+            sTypoLineGap: 600 → 0
+            fsSelection (USE_TYPO_METRICS): clear → set
+hhea table:
+            ascent: 750 → 920
+            descent: -100 → -380
+            lineGap: 600 → 0
+            vertical span: 850 → 1300 (+45.0% UPM)
+
+<span class="ok"> SUCCESS</span>    Processing Completed!
+            updated: 2 | unchanged: 0 | errors: 0
+            Total time: 1.2s</div>
+    <p>Example-Bold.otf prints the same block when it started from the same numbers, and the tally counts both files. When the styles already differ, the before-numbers differ and the after-numbers still share one plan.</p>
+
+    <h2>Labels</h2>
+    <table>
+      <thead>
+        <tr><th>Label</th><th>What it’s doing</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="term">INFO</span></td>
+          <td>Progress. Measuring, grouping, then the plan for each family.</td>
+        </tr>
+        <tr>
+          <td><span class="term">MAJOR</span></td>
+          <td>The line box is moving a lot. Read the next line before you answer the prompt. Moderate and Minimal are the quieter versions of this line.</td>
+        </tr>
+        <tr>
+          <td><span class="term">INPUT</span></td>
+          <td>Waiting for you. <code>y</code> writes the files in place. <code>n</code> stops the run. A blank answer asks again.</td>
+        </tr>
+        <tr>
+          <td><span class="term">UPDATED</span></td>
+          <td>What changed in that file: old value, then new value.</td>
+        </tr>
+        <tr>
+          <td><span class="term">SUCCESS</span></td>
+          <td>The tally. <span class="term">updated</span> files were written, <span class="term">unchanged</span> already matched the plan, <span class="term">errors</span> could not be written.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>The summary line</h2>
+    <p><code>Family: Example (2 fonts)</code> is the group that shared a family name. <code>Core cluster: 2 fonts | UPM: 1000</code> means both styles were close enough in cap height to share one box. <code>1000</code> is the em. That number stays 1000.</p>
+    <p><code>UPM scaled by ~45.0%</code> is how far the box edges moved, added together, as a percent of the em. The top edge moves 170 units (920 − 750) and the bottom edge moves 280 units (380 − 100). 170 + 280 = 450, and 450 is 45% of 1000. When styles in the group move by different amounts, the printed figure is their average.</p>
+    <p><code>increasing vertical height by 52.9%</code> compares the new box with the old one. The box was 850 units tall (750 + 100) and is now 1300 (920 + 380). 1300 is 52.9% taller than 850. That 1300 is the default letter-height floor: 130% of the em. The line gap is left out of that height.</p>
+    <p><code>linegap set to 0</code> removes the warm band. Baseline-to-baseline distance is the box plus that gap: 850 + 600 = 1450 before, and 1300 + 0 = 1300 after.</p>
+
+    <table>
+      <thead>
+        <tr><th>Word on the summary</th><th>Movement, as a percent of the em</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Minimal Normalization</td>
+          <td>Under 2%</td>
+        </tr>
+        <tr>
+          <td>Moderate Normalization</td>
+          <td>At least 2% and below 8%</td>
+        </tr>
+        <tr>
+          <td>Major Normalization</td>
+          <td>8% or more</td>
+        </tr>
+      </tbody>
+    </table>
+    <p>Under about 0.1%, or when the values already match, the run says no changes are needed.</p>
+
+    <h2>What changed in the file</h2>
+    <p>Above-baseline and below-baseline in the drawing are stored twice, once in OS/2 and once in hhea, and ebrium writes both copies together. Below-baseline is stored as a negative number: 100 below the baseline is <code>-100</code>, which is why the descenders hang out of the old box.</p>
+    <table>
+      <thead>
+        <tr><th>Field</th><th>In the drawing</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>sTypoAscender</code>, hhea <code>ascent</code></td>
+          <td>Top of the line box. 750 → 920. The 920 is the capital height plus the default 25% of headroom.</td>
+        </tr>
+        <tr>
+          <td><code>sTypoDescender</code>, hhea <code>descent</code></td>
+          <td>Bottom of the line box. −100 → −380. The old 100 is shorter than the descenders, so they hang out. Together with 920, the new box is the 1300-unit default.</td>
+        </tr>
+        <tr>
+          <td><code>sTypoLineGap</code>, hhea <code>lineGap</code></td>
+          <td>The gap between boxes. 600 → 0.</td>
+        </tr>
+        <tr>
+          <td><code>fsSelection (USE_TYPO_METRICS)</code></td>
+          <td>Tells apps to use the typo line box for line spacing. On OS/2 version 4 or newer, ebrium turns that bit on. The line is absent when it was already set, and on older OS/2 tables.</td>
+        </tr>
+        <tr>
+          <td><code>usWinAscent</code>, <code>usWinDescent</code></td>
+          <td>The clipping box: how far drawing may go before it is cut off. Ascent is above the baseline. Descent is below it and stored as a positive number (120 → 380). In this example they move out to the new box so the letters are not clipped.</td>
+        </tr>
+        <tr>
+          <td><code>vertical span</code></td>
+          <td>Top plus bottom, with the line gap left out: 850 → 1300. <code>+45.0% UPM</code> is that 450-unit change divided by the em of 1000 — the same 45% as the summary, scored against the em again.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>If you add <code>-v</code> or <code>-vv</code></h2>
+    <p><code>-v</code> adds the measured cap height to the cluster line. For this drawing the capitals are 670 units, so the line gains <code>(cap height ≈ 670/1000 = 0.670)</code>. That is the size of the letters. It is a separate number from the line box.</p>
+    <p><code>-vv</code> adds lines marked <code>DEBUG</code>. They name the step that is running: sorting styles into the cluster, building the shared plan, then checking that the clipping box covers the line box. The plan is the same without them.</p>
+
+    <div class="callout">
+      <strong>Preview first.</strong> <code>-n</code> prints the same file list with a dry-run marker and does not write. <code>--report</code> is a different printout — family plan versus each style alone. See <a href="report.html">Report lookup</a>.
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <a href="concepts.html">← Concepts</a>
+    · <a href="report.html">Report lookup →</a>
+  </footer>
+</body>
+</html>

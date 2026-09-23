@@ -6,7 +6,7 @@
   <title>Concepts · ebrium</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Sora:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Great+Vibes&family=IBM+Plex+Mono:wght@400;500&family=Kablammo&family=Mozilla+Headline:wght@200;700&family=Sora:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=Unica+One&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -18,6 +18,7 @@
         <a href="concepts.html" aria-current="page">Concepts</a>
         <a href="logic.html">How it thinks</a>
         <a href="flags.html">Flags</a>
+        <a href="terminal.html">Terminal</a>
         <a href="report.html">Report lookup</a>
       </nav>
       <a class="github-link" href="https://github.com/andrewsipe/ebrium">GitHub</a>
@@ -36,7 +37,56 @@
     <p>A set of fonts treated as optically identical: same planned typo/hhea after normalization (scaled per UPM). Cap height is primary; x-height and descenders are checked more loosely; a large overall bbox span ratio can keep two fonts out of the same cluster (scripts / decorative faces).</p>
     <p>Under <code>family</code>, clustering is the default. <code>--safe-max</code> skips it and uses bbox extremes for every font — an advanced opt-out when metrics are unpredictable or mis-detected.</p>
 
-    <h2>Typo / hhea vs Win</h2>
+    <h2 id="line-box">Typo / hhea vs Win</h2>
+    <p>A default run makes the line box at least 130% of the em — 1300 units when the em is 1000 — and sets the line gap to 0. Baseline to baseline is then 1300. The before picture is a file that has not been through that run. The letters stay the same size, and the em stays 1000.</p>
+
+    <!-- Specimen: em 1000, Source Serif 4. Before 720 / 180 / gap 280. After 960 / 300 / gap 0. Keep in sync with terminal.html. -->
+    <figure class="linebox">
+      <div class="linebox-panels">
+        <div class="linebox-panel">
+          <p class="meta">Before</p>
+          <h3>Clips, with a wide gap</h3>
+          <div class="stack before">
+            <div class="ln"><span>Happy dogs play</span></div>
+            <div class="band">line gap</div>
+            <div class="ln"><span>in the garden</span></div>
+            <div class="band">line gap</div>
+            <div class="ln"><span>at dusk.</span></div>
+            <div class="measure">1450<small>baselines</small></div>
+          </div>
+          <ul class="linebox-nums">
+            <li><span>Above baseline</span>750</li>
+            <li><span>Below baseline</span>100</li>
+            <li><span>Line gap</span>600</li>
+          </ul>
+        </div>
+        <div class="linebox-panel">
+          <p class="meta">After</p>
+          <h3>Default: 1300, no gap</h3>
+          <div class="stack after">
+            <div class="ln"><span>Happy dogs play</span></div>
+            <div class="ln"><span>in the garden</span></div>
+            <div class="ln"><span>at dusk.</span></div>
+            <div class="measure">1300<small>baselines</small></div>
+          </div>
+          <ul class="linebox-nums">
+            <li><span>Above baseline</span>920</li>
+            <li><span>Below baseline</span>380</li>
+            <li><span>Line gap</span>0</li>
+          </ul>
+        </div>
+      </div>
+      <ul class="linebox-key">
+        <li><i class="swatch box" aria-hidden="true"></i>Line box</li>
+        <li><i class="swatch gap" aria-hidden="true"></i>Line gap</li>
+        <li><i class="swatch ghost" aria-hidden="true"></i>Previous box</li>
+        <li><i class="swatch base" aria-hidden="true"></i>Baseline</li>
+      </ul>
+      <figcaption>
+        The em is 1000. Before, the box is only 850 tall, so the descenders hang out of it, and a 600-unit gap sits between lines. The baselines are 1450 apart. After a default run the box is 1300 tall and the gap is 0, so the baselines are 1300 apart. 920 of that box is above the baseline: the capital height plus the default 25% of headroom. <a href="terminal.html">Reading a run</a> uses these numbers.
+      </figcaption>
+    </figure>
+
     <ul>
       <li><span class="term">typoAscender / typoDescender / typoLineGap</span> (OS/2) and matching <span class="term">hhea</span> values define the line box many apps use when <code>USE_TYPO_METRICS</code> is on (OS/2 v4+).</li>
       <li><span class="term">usWinAscent / usWinDescent</span> are clipping bounds. Family-wide Win uses normalized extremes so nothing clips; decorative outliers can expand Win while still inheriting typo from the core cluster.</li>
@@ -49,8 +99,59 @@
     <h2>Family pull</h2>
     <p>When several fonts share a family plan, a style with smaller solo ascenders can be <em>pulled up</em> toward the family driver. That’s intentional for a shared line box. <code>--report</code> quantifies it; <code>--max-adjustment</code> caps it; <code>individual</code> avoids it entirely.</p>
 
-    <h2>Detection labels</h2>
-    <p>Filename (or measurement) heuristics can mark fonts as script, decorative, unicase, or uniwidth. Override with <code>-a/--assume TYPE:PATTERN</code>. <code>--exclude-measuring</code> keeps a font out of family calculations without classifying it — different job, different flag.</p>
+    <h2 id="assume">Detection labels</h2>
+    <p>Filename or measurement heuristics can mark fonts as script, decorative, unicase, or uniwidth. When a file is missed, force it with <code>-a/--assume TYPE:PATTERN</code>. The pictures use stand-in typefaces so the categories are visible. In the script and decorative pictures, the solid box is the shared line box and the dashed box is the clipping box. <code>--exclude-measuring</code> keeps a font out of the family math without classifying it.</p>
+    <div class="modes">
+      <article class="mode">
+        <p class="meta">script</p>
+        <h3>Swashes fall past the shared box</h3>
+        <div class="stage script-stage" aria-hidden="true">
+          <div class="clip"></div>
+          <div class="shared"></div>
+          <span class="word">Playfully</span>
+          <i class="bl"></i>
+        </div>
+        <p class="what">The script keeps the family’s line box. The clipping box grows around the swashes, with extra room below.</p>
+        <p class="flag"><code>-a script:"*Script*"</code></p>
+      </article>
+      <article class="mode">
+        <p class="meta">decorative</p>
+        <h3>The outline is taller than the text</h3>
+        <div class="stage deco-stage" aria-hidden="true">
+          <div class="clip"></div>
+          <div class="shared"></div>
+          <span class="word">Decorative</span>
+          <i class="bl"></i>
+        </div>
+        <p class="what">Illustrative and ornamental faces have a taller outline than the text styles. They keep the family’s line box. The clipping box grows around that outline, so it doesn’t pull the whole family taller.</p>
+        <p class="flag"><code>-a decorative:"*Display*"</code></p>
+      </article>
+      <article class="mode">
+        <p class="meta">unicase</p>
+        <h3>One letter height, one baseline</h3>
+        <div class="stage align-stage" aria-hidden="true">
+          <div class="pair">
+            <span class="face">Hx</span>
+            <span class="uni">Hx</span>
+            <span class="xlab">x-height</span>
+          </div>
+        </div>
+        <p class="what">The unicase sits on the text face’s baseline, and its letter height lines up with that face’s x-height. It needs less room above the letters.</p>
+        <p class="flag"><code>-a unicase:"*Unicase*"</code></p>
+      </article>
+      <article class="mode">
+        <p class="meta">uniwidth</p>
+        <h3>Bold occupies the same width</h3>
+        <div class="stage width-stage" aria-hidden="true">
+          <div class="widths">
+            <span class="w400">Handgloves</span>
+            <span class="w800">Handgloves</span>
+          </div>
+        </div>
+        <p class="what">The weights already share their widths, so a weight change does not reflow the line. ebrium keeps that, and still gives the family one line box.</p>
+        <p class="flag"><code>-a uniwidth:"*Headline*"</code></p>
+      </article>
+    </div>
 
     <h2>Superfamily</h2>
     <p>Families whose names share a prefix can be merged into one planning unit (<code>superfamily</code>). Use <code>--exclude</code> to keep a family out of that merge, and <code>--combine</code> / <code>--ignore-term</code> when names don’t group the way you want.</p>
@@ -61,7 +162,7 @@
 
   <footer class="site-footer">
     <a href="index.html">← Home</a>
-    · <a href="logic.html">How it thinks →</a>
+    · <a href="terminal.html">Reading a run →</a>
   </footer>
 </body>
 </html>

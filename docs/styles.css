@@ -411,3 +411,479 @@ td code {
 .report-sample .ok {
   color: #8fbc8f;
 }
+
+.report-sample.wrap {
+  white-space: pre-wrap;
+  overflow-x: visible;
+}
+
+/* —— line box specimen —— */
+
+.linebox {
+  margin: 1.25rem 0 1.5rem;
+}
+
+.linebox-panels {
+  display: grid;
+  gap: 0.75rem;
+}
+
+@media (min-width: 700px) {
+  .linebox-panels {
+    grid-template-columns: 1fr 1fr;
+    align-items: start;
+  }
+}
+
+.linebox-panel {
+  background: var(--paper-raised);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  padding: 0.9rem 0.85rem 0.8rem;
+  min-width: 0;
+}
+
+.linebox-panel .meta {
+  margin-bottom: 0.2rem;
+}
+
+.linebox-panel h3 {
+  font-size: 0.95rem;
+  margin: 0 0 0.7rem;
+}
+
+/* Paragraph specimen. Lengths are rem so the baseline bracket
+   does not shrink to the label's font size.
+   Source Serif 4 baseline is 0.855em from the top of a line-height:1 box. */
+.stack {
+  --fs: 1.55rem;
+  position: relative;
+  font-family: var(--serif);
+  font-size: var(--fs);
+  font-weight: 400;
+  line-height: 1;
+  padding-right: 4.4rem;
+  --side: calc(0.35 * var(--fs));
+  --lead: calc(var(--above) + var(--below) + var(--gap) - var(--overlap));
+}
+
+.ln {
+  position: relative;
+  height: calc(var(--above) + var(--below));
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+}
+
+.stack.before {
+  /* 750 above, 100 below, gap 600. Span 850. Baselines 1450.
+     Descenders (~260) hang out of the box. */
+  --above: calc(0.75 * var(--fs));
+  --below: calc(0.1 * var(--fs));
+  --gap: calc(0.6 * var(--fs));
+  --overlap: 0px;
+}
+
+.stack.after {
+  /* Default: cap 670 + 25% headroom = 920 above, 380 below.
+     Span 1300. Line gap 0. Baselines 1300. */
+  --above: calc(0.92 * var(--fs));
+  --below: calc(0.38 * var(--fs));
+  --gap: 0px;
+  --overlap: 1.5px;
+}
+
+.stack.after .ln + .ln {
+  margin-top: -1.5px;
+}
+
+.ln span {
+  position: absolute;
+  z-index: 2;
+  left: var(--side);
+  top: calc(var(--above) - 0.855 * var(--fs));
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.ln::after {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  left: 0;
+  right: 0;
+  top: var(--above);
+  border-top: 1.25px solid var(--ink);
+}
+
+.stack.after .ln::before {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  left: 4px;
+  right: 4px;
+  top: calc(var(--above) - 0.75 * var(--fs));
+  bottom: calc(var(--below) - 0.1 * var(--fs));
+  border: 1px dashed var(--ink-soft);
+  pointer-events: none;
+}
+
+.band {
+  height: var(--gap);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--warn-bg);
+  color: var(--warn);
+  font-family: var(--sans);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.measure {
+  position: absolute;
+  top: var(--above);
+  right: 0.15rem;
+  height: var(--lead);
+  width: 3.7rem;
+  border-left: 1px solid var(--ink-soft);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding-left: 0.45rem;
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.15;
+  color: var(--ink);
+}
+
+.measure small {
+  display: block;
+  margin-top: 0.15rem;
+  font-family: var(--sans);
+  font-size: 0.62rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft);
+}
+
+.measure::before,
+.measure::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  width: 7px;
+  border-top: 1px solid var(--ink-soft);
+}
+
+.measure::before {
+  top: 0;
+}
+
+.measure::after {
+  bottom: 0;
+}
+
+/* Assume-mode specimens */
+.modes {
+  display: grid;
+  gap: 0.75rem;
+  margin: 1rem 0 1.25rem;
+}
+
+@media (min-width: 700px) {
+  .modes {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.mode {
+  background: var(--paper-raised);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  padding: 0.85rem 0.9rem 0.95rem;
+  min-width: 0;
+}
+
+.mode h3 {
+  font-size: 0.95rem;
+  margin: 0 0 0.6rem;
+}
+
+.mode .what {
+  margin: 0.6rem 0 0;
+  font-size: 0.92rem;
+  color: var(--ink-soft);
+}
+
+.mode .flag {
+  margin: 0.45rem 0 0;
+}
+
+.stage {
+  position: relative;
+  height: 9.2rem;
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  overflow: hidden;
+}
+
+.stage .shared,
+.stage .clip {
+  position: absolute;
+  left: 0.7rem;
+  right: 0.7rem;
+}
+
+.stage .shared {
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+}
+
+.stage .clip {
+  border: 1px dashed var(--ink-soft);
+}
+
+/* Script and decorative share one baseline so the two cards line up.
+   --ratio is that face's baseline, as a fraction of its em, from the top of a line-height:1 box. */
+.script-stage,
+.deco-stage {
+  --base: 5.35rem;
+}
+
+.script-stage {
+  --word-size: 3.15rem;
+  --ratio: 0.725;
+}
+
+.deco-stage {
+  --word-size: 2.45rem;
+  --ratio: 0.89;
+}
+
+.script-stage .word,
+.deco-stage .word {
+  position: absolute;
+  left: 50%;
+  top: calc(var(--base) - var(--ratio) * var(--word-size));
+  transform: translateX(-50%);
+  font-size: var(--word-size);
+  line-height: 1;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.script-stage .word {
+  font-family: "Great Vibes", cursive;
+}
+
+.deco-stage .word {
+  font-family: "Kablammo", system-ui, sans-serif;
+  font-variation-settings: "MORF" 35;
+}
+
+.script-stage .shared,
+.deco-stage .shared {
+  top: calc(var(--base) - 0.7rem);
+  height: 1.15rem;
+}
+
+.script-stage .clip {
+  /* ink of "Playfully": 0.814em above the baseline, 0.351em below, plus a little air */
+  top: calc(var(--base) - 0.814 * var(--word-size) - 0.2rem);
+  height: calc(1.165 * var(--word-size) + 0.4rem);
+}
+
+.deco-stage .clip {
+  top: calc(var(--base) - var(--ratio) * var(--word-size) - 0.28rem);
+  height: calc(var(--word-size) + 0.56rem);
+}
+
+.script-stage .bl,
+.deco-stage .bl {
+  position: absolute;
+  left: 0.7rem;
+  right: 0.7rem;
+  top: var(--base);
+  border-top: 1.25px solid var(--ink);
+  z-index: 2;
+}
+
+.align-stage {
+  --serif: 3.6rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.9rem;
+}
+
+.pair {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 1.15rem;
+  padding-right: 25%;
+  width: 100%;
+  line-height: 1;
+  padding-bottom: 0.7rem;
+}
+
+.pair::before,
+.pair::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  border-top: 1px dashed var(--rule-strong);
+}
+
+.pair::after {
+  right: 0;
+  bottom: calc(0.7rem + 0.145 * var(--serif));
+  border-top: 1.5px solid var(--ink);
+}
+
+.pair::before {
+  right: 4.2rem;
+  bottom: calc(0.7rem + 0.145 * var(--serif) + 0.452 * var(--serif));
+}
+
+.pair .face {
+  font-family: var(--serif);
+  font-size: var(--serif);
+  line-height: 1;
+}
+
+.pair .uni {
+  font-family: "Unica One", sans-serif;
+  font-size: calc(var(--serif) * 0.452 / 0.65);
+  line-height: 1;
+}
+
+.xlab {
+  position: absolute;
+  right: 0;
+  bottom: calc(0.7rem + 0.145 * var(--serif) + 0.452 * var(--serif));
+  transform: translateY(50%);
+  font-family: var(--sans);
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.width-stage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: "Mozilla Headline", var(--sans);
+  font-size: 1.45rem;
+  line-height: 1;
+}
+
+.widths {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  width: max-content;
+  border-right: 1.5px solid var(--ink-soft);
+}
+
+.width-stage span {
+  display: block;
+  border: 1.5px solid var(--accent);
+  background: var(--accent-soft);
+  padding: 0.12em 0.28em 0.16em;
+  margin-right: -1.5px;
+}
+
+.width-stage .w400 {
+  font-weight: 200;
+}
+
+.width-stage .w800 {
+  font-weight: 700;
+}
+
+.linebox-nums {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.4rem 0.5rem;
+  margin: 0.75rem 0 0;
+  padding: 0.65rem 0 0;
+  border-top: 1px solid var(--rule);
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.linebox-nums li {
+  margin: 0;
+}
+
+.linebox-nums span {
+  display: block;
+  margin-bottom: 0.1rem;
+  font-family: var(--sans);
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.linebox-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1rem;
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  font-family: var(--sans);
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+}
+
+.linebox-key li {
+  margin: 0;
+}
+
+.linebox figcaption {
+  margin-top: 0.85rem;
+  color: var(--ink-soft);
+  font-size: 0.98rem;
+}
+
+.swatch {
+  display: inline-block;
+  width: 0.85rem;
+  height: 0.55rem;
+  margin-right: 0.35rem;
+  vertical-align: -1px;
+  border-radius: 1px;
+}
+
+.swatch.box {
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+}
+
+.swatch.gap {
+  background: var(--warn-bg);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--warn) 45%, var(--rule));
+}
+
+.swatch.ghost {
+  background: transparent;
+  border: 1px dashed var(--ink-soft);
+  height: 0.5rem;
+}
+
+.swatch.base {
+  background: var(--ink);
+  height: 2px;
+  vertical-align: 2px;
+}
