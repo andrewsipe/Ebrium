@@ -41,7 +41,7 @@ def group_families(args, measures, forced_groups):
     Args:
         args: Parsed command-line arguments (must have grouping_mode attribute)
         measures: List of FontMeasures
-        forced_groups: List of forced group merges from --combine
+        forced_groups: List of forced group merges from --merge
 
     Returns:
         Dict mapping group name to list of FontMeasures
@@ -67,7 +67,7 @@ def group_families(args, measures, forced_groups):
         groups = sorter.group_by_family(forced_groups=forced_groups)
 
         cs.StatusIndicator("info").add_message(
-            f"Found {cs.fmt_count(len(groups))} family group(s) (--safe-max, no clustering)"
+            f"Found {cs.fmt_count(len(groups))} family group(s) (--no-cluster, no clustering)"
         ).emit(console)
 
         if forced_groups:

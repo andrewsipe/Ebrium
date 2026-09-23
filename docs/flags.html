@@ -18,7 +18,7 @@
         <a href="concepts.html">Concepts</a>
         <a href="logic.html">How it thinks</a>
         <a href="flags.html" aria-current="page">Flags</a>
-        <a href="terminal.html">Terminal</a>
+        <a href="terminal.html">Reading a run</a>
         <a href="report.html">Report lookup</a>
       </nav>
       <a class="github-link" href="https://github.com/andrewsipe/ebrium">GitHub</a>
@@ -45,11 +45,11 @@
         </tr>
         <tr>
           <td><code>family</code></td>
-          <td><code>--safe-max</code>, <code>--combine</code>, <code>--ignore-term</code>, <code>--line-box*</code>, <code>--report</code>, <code>--max-adjustment</code></td>
+          <td><code>--no-cluster</code>, <code>--merge</code>, <code>--ignore-term</code>, <code>--line-box*</code>, <code>--report</code>, <code>--max-adjustment</code></td>
         </tr>
         <tr>
           <td><code>superfamily</code></td>
-          <td>Same as family except <code>--safe-max</code>; plus <code>--exclude</code></td>
+          <td>Same as family except <code>--no-cluster</code>; plus <code>--exclude</code></td>
         </tr>
         <tr>
           <td><code>probe</code></td>
@@ -85,8 +85,8 @@
       </thead>
       <tbody>
         <tr>
-          <td><code>--safe-max</code></td>
-          <td>Skip clustering; bbox extremes for every font. Advanced — for unpredictable / mis-detected metrics. Default is to cluster.</td>
+          <td><code>--no-cluster</code></td>
+          <td>Skip clustering; bbox extremes for every font. For unpredictable or mis-detected metrics. Default is to cluster. Formerly <code>--safe-max</code>.</td>
         </tr>
       </tbody>
     </table>
@@ -99,8 +99,8 @@
       <tbody>
         <tr><td><code>--max-adjustment %</code></td><td>Cap how far family extremes may pull a font</td></tr>
         <tr>
-          <td><code>-c, --combine "A,B"</code></td>
-          <td>One complete merge group per flag. Repeat <code>--combine</code> for separate groups. <code>-c A -c B</code> does <strong>not</strong> merge A with B.</td>
+          <td><code>-m, --merge "A,B"</code></td>
+          <td>One complete group per flag. Repeat <code>--merge</code> for separate groups. <code>-m A -m B</code> does <strong>not</strong> merge A with B. Formerly <code>-c</code> / <code>--combine</code>.</td>
         </tr>
         <tr>
           <td><code>-i, --ignore-term TERM</code></td>
@@ -123,6 +123,10 @@
       <strong>Abbreviation trap.</strong> Parsers set <code>allow_abbrev=False</code>, so <code>--exclude</code> under <code>individual</code> errors instead of silently matching <code>--exclude-measuring</code>.
     </div>
 
+    <div class="callout">
+      <strong>Exit codes.</strong> <code>0</code> done; <code>1</code> no font files; <code>2</code> no measurable fonts, or bad arguments; <code>3</code> aborted at the prompt. <code>probe</code> only uses 0, 1, and 2.
+    </div>
+
     <h2>Recipes</h2>
     <pre><code># Preview family plan
 ebrium family fonts/ -r -n
@@ -131,10 +135,10 @@ ebrium family fonts/ -r -n
 ebrium family fonts/ -r --report
 
 # Unpredictable metrics: skip clustering
-ebrium family fonts/ -r --safe-max
+ebrium family fonts/ -r --no-cluster
 
 # Force two families into one group before clustering
-ebrium family fonts/ -r --combine "Display,DisplayAlt"
+ebrium family fonts/ -r --merge "Display,DisplayAlt"
 
 # Unify line box from the main optical cluster
 ebrium family fonts/ -r -b force-baseline-main-cluster

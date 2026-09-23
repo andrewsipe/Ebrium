@@ -90,7 +90,7 @@ def validate_args(args: argparse.Namespace) -> None:
 
     if args.grouping_mode == "conservative":
         cs.StatusIndicator("info").add_message(
-            "--safe-max: using bbox extremes for all fonts (no clustering, prevents clipping)"
+            "--no-cluster: using bbox extremes for all fonts (no clustering, prevents clipping)"
         ).emit(console)
 
     # Report pattern overrides

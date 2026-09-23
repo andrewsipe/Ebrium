@@ -18,7 +18,7 @@
         <a href="concepts.html" aria-current="page">Concepts</a>
         <a href="logic.html">How it thinks</a>
         <a href="flags.html">Flags</a>
-        <a href="terminal.html">Terminal</a>
+        <a href="terminal.html">Reading a run</a>
         <a href="report.html">Report lookup</a>
       </nav>
       <a class="github-link" href="https://github.com/andrewsipe/ebrium">GitHub</a>
@@ -35,7 +35,7 @@
 
     <h2>Cluster</h2>
     <p>A set of fonts treated as optically identical: same planned typo/hhea after normalization (scaled per UPM). Cap height is primary; x-height and descenders are checked more loosely; a large overall bbox span ratio can keep two fonts out of the same cluster (scripts / decorative faces).</p>
-    <p>Under <code>family</code>, clustering is the default. <code>--safe-max</code> skips it and uses bbox extremes for every font — an advanced opt-out when metrics are unpredictable or mis-detected.</p>
+    <p>Under <code>family</code>, clustering is the default. <code>--no-cluster</code> skips it and uses bbox extremes for every font — for metrics that are unpredictable or mis-detected.</p>
 
     <h2 id="line-box">Typo / hhea vs Win</h2>
     <p>A default run makes the line box at least 130% of the em — 1300 units when the em is 1000 — and sets the line gap to 0. Baseline to baseline is then 1300. The before picture is a file that has not been through that run. The letters stay the same size, and the em stays 1000.</p>
@@ -154,10 +154,13 @@
     </div>
 
     <h2>Superfamily</h2>
-    <p>Families whose names share a prefix can be merged into one planning unit (<code>superfamily</code>). Use <code>--exclude</code> to keep a family out of that merge, and <code>--combine</code> / <code>--ignore-term</code> when names don’t group the way you want.</p>
+    <p>Families whose names share a prefix can be merged into one planning unit (<code>superfamily</code>). Use <code>--exclude</code> to keep a family out of that merge, and <code>--merge</code> / <code>--ignore-term</code> when names don’t group the way you want. Each <code>--merge</code> is one complete group: <code>--merge "A,B"</code> merges A and B, and <code>-m A -m B</code> does not.</p>
 
     <h2>Checkpoint</h2>
-    <p>Every measuring run (including <code>-n</code> / <code>--report</code>) writes <code>.metrics_checkpoint.json</code> in the <strong>current working directory</strong>. It caches measurements and clusters and resets when options or the font set change. <code>probe</code> never measures, so it never writes one.</p>
+    <div class="callout warn">
+      <strong>A cache file is written.</strong> Every measuring run, including <code>-n</code> and <code>--report</code>, writes <code>.metrics_checkpoint.json</code> in the current working directory. <code>probe</code> does not measure, so it does not write one.
+    </div>
+    <p>The file caches measurements and clusters, and it resets when the options or the font set change.</p>
   </main>
 
   <footer class="site-footer">

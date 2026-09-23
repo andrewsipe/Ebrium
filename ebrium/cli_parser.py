@@ -2,7 +2,7 @@
 
 Earlier revisions put every flag at the top level and used runtime warnings
 (validate_args) to say "this flag does nothing in that mode" -- e.g.
---exclude only works with superfamily, --combine/--line-box are no-ops with
+--exclude only works with superfamily, --merge/--line-box are no-ops with
 individual, --probe-variation-metrics ignores most of the other flags. That
 information already existed as branches in grouping.py/planning.py; the
 parser just wasn't shaped the same way.
@@ -10,7 +10,7 @@ parser just wasn't shaped the same way.
 This version has one subcommand per branch:
 
   ebrium individual  [options] PATH...   -- each font normalized alone
-  ebrium family      [options] PATH...   -- group by family, optional --safe-max
+  ebrium family      [options] PATH...   -- group by family, optional --no-cluster
   ebrium superfamily [options] PATH...   -- merge shared-prefix families
   ebrium probe       [options] PATH...   -- read-only MVAR/HVAR report
                                              (was --probe-variation-metrics;
@@ -90,7 +90,7 @@ def _assume_value(raw: str) -> tuple[str, str]:
 
 MODE_SUMMARY = {
     "individual": "normalize each font on its own; no grouping or clustering",
-    "family": "group by family name; cluster within each family (add --safe-max to skip clustering)",
+    "family": "group by family name; cluster within each family (add --no-cluster to skip clustering)",
     "superfamily": "merge families sharing a name prefix; cluster across the superfamily",
     "probe": "read-only MVAR/HVAR coverage report; no grouping, measuring, or writing",
 }
@@ -129,9 +129,9 @@ CHECKPOINT_NOTE = (
 )
 
 COMBINE_NOTE = (
-    '--combine merges the families named in ONE flag, e.g. --combine "A,B". Repeat '
-    "--combine for further groups, but a group must be complete in a single flag: "
-    "-c A -c B does not merge A with B -- each is its own group of one and gets "
+    '--merge names one complete group per flag, e.g. --merge "A,B". Repeat '
+    "--merge for further groups. A group must be complete inside a single flag: "
+    "-m A -m B does not merge A with B — each is its own group of one and is "
     "skipped with a warning."
 )
 
@@ -218,12 +218,16 @@ def _add_detection_args(p: argparse.ArgumentParser, g: argparse._ArgumentGroup) 
     p.add_argument("--max-span-ratio", type=float, default=1.5, help=argparse.SUPPRESS)
 
 
-def _add_grouping_mod_args(g: argparse._ArgumentGroup) -> None:
+def _add_grouping_mod_args(p: argparse.ArgumentParser, g: argparse._ArgumentGroup) -> None:
     g.add_argument(
-        "-c", "--combine", action="append", metavar="GROUP",
+        "-m", "--merge", action="append", dest="combine", metavar="GROUP",
         help='merge one group of families per flag, comma-separated inside the flag: '
-        '--combine "Font A,Font B" (repeat --combine for further, separate groups -- '
-        "don't split one group across repeats, e.g. -c A -c B merges nothing)",
+        '--merge "Font A,Font B" (repeat --merge for further, separate groups — '
+        "each flag is one group: -m A -m B does not merge A with B)",
+    )
+    # Old spelling. Same destination, hidden from help.
+    p.add_argument(
+        "-c", "--combine", action="append", dest="combine", help=argparse.SUPPRESS,
     )
     g.add_argument(
         "-i", "--ignore-term", action="append", metavar="TERM",
@@ -325,7 +329,7 @@ def _build_family(subparsers: argparse._SubParsersAction) -> None:
     g_in = p.add_argument_group("input")
     g_run = p.add_argument_group("preview and confirmation")
     g_mod = p.add_argument_group("grouping modifiers (repeatable)")
-    g_cluster = p.add_argument_group("clustering override")
+    g_cluster = p.add_argument_group("clustering")
     g_det = p.add_argument_group("detection overrides (filename globs, repeatable)")
     g_space = p.add_argument_group("vertical spacing (% of UPM)")
     g_box = p.add_argument_group("line box (typo / hhea)")
@@ -336,20 +340,20 @@ def _build_family(subparsers: argparse._SubParsersAction) -> None:
         ("ebrium family fonts/ -r -n", "preview the changes"),
         ("ebrium family fonts/ -r --report", "family vs per-font analysis (implies -n)"),
         ("ebrium family fonts/ -r -y", "skip the confirmation prompt"),
-        ("ebrium family fonts/ --safe-max", "skip clustering (unpredictable / mis-detected metrics)"),
+        ("ebrium family fonts/ --no-cluster", "skip clustering (unpredictable / mis-detected metrics)"),
         ("ebrium family fonts/ --ignore-term Adobe", "drop a shared word before grouping"),
-        ('ebrium family fonts/ --combine "A,B"', "force-merge two families before clustering"),
+        ('ebrium family fonts/ --merge "A,B"', "merge two families before clustering"),
         ("ebrium family fonts/ --line-box force-baseline", "unify the typo/hhea line box"),
         ("ebrium family fonts/ --line-box-from Bold.ttf", "pin the line-box reference font"),
     ]
     notes = [
         CHECKPOINT_NOTE,
         COMBINE_NOTE,
-        "--combine and --ignore-term still apply with --safe-max; clustering is what's skipped.",
+        "--merge and --ignore-term still apply with --no-cluster; clustering is what's skipped.",
         "--line-box-from pins an explicit reference font; it wins over "
         "--line-box force-baseline-main-cluster when both would pick one.",
         "--line-box force-baseline (and force-baseline-main-cluster) skip single-font "
-        "families (e.g. a lone 'Name Variable'); pair them with --combine.",
+        "families (e.g. a lone 'Name Variable'); pair them with --merge.",
     ]
 
     _add_help(
@@ -372,13 +376,14 @@ def _build_family(subparsers: argparse._SubParsersAction) -> None:
     _add_input_args(g_in)
     _add_preview_args(g_run)
     _add_report_arg(g_run)
-    _add_grouping_mod_args(g_mod)
+    _add_grouping_mod_args(p, g_mod)
     g_cluster.add_argument(
-        "--safe-max", action="store_true",
+        "--no-cluster", action="store_true",
         help="skip clustering; use bbox extremes for every font in the family "
-        "(default is to cluster; advanced — for unpredictable metrics that get "
-        "incorrectly detected)",
+        "(default is to cluster; for unpredictable metrics that get "
+        "incorrectly detected). Formerly --safe-max.",
     )
+    p.add_argument("--safe-max", action="store_true", dest="no_cluster", help=argparse.SUPPRESS)
     _add_detection_args(p, g_det)
     _add_spacing_args(g_space)
     _add_line_box_args(g_box)
@@ -408,18 +413,18 @@ def _build_superfamily(subparsers: argparse._SubParsersAction) -> None:
         ("ebrium superfamily fonts/ -r --report", "family vs per-font analysis (implies -n)"),
         ("ebrium superfamily fonts/ --exclude Mono", "keep a family out of the merge"),
         ("ebrium superfamily fonts/ --ignore-term Adobe", "drop a shared word before grouping"),
-        ('ebrium superfamily fonts/ --combine "A,B"', "force-merge two families before the prefix merge"),
+        ('ebrium superfamily fonts/ --merge "A,B"', "merge two families before the prefix merge"),
         ("ebrium superfamily fonts/ --line-box force-baseline", "unify the typo/hhea line box"),
     ]
     notes = [
         CHECKPOINT_NOTE,
         COMBINE_NOTE,
-        "--exclude keeps a family out of the superfamily merge; --combine still "
-        "force-merges named families first.",
+        "--exclude keeps a family out of the superfamily merge; --merge still "
+        "merges named families first.",
         "--line-box-from pins an explicit reference font; it wins over "
         "--line-box force-baseline-main-cluster when both would pick one.",
         "--line-box force-baseline (and force-baseline-main-cluster) skip single-font "
-        "families (e.g. a lone 'Name Variable'); pair them with --combine.",
+        "families (e.g. a lone 'Name Variable'); pair them with --merge.",
     ]
 
     _add_help(
@@ -442,7 +447,7 @@ def _build_superfamily(subparsers: argparse._SubParsersAction) -> None:
     _add_input_args(g_in)
     _add_preview_args(g_run)
     _add_report_arg(g_run)
-    _add_grouping_mod_args(g_mod)
+    _add_grouping_mod_args(p, g_mod)
     g_mod.add_argument(
         "-e", "--exclude", action="append", metavar="FAMILY",
         help="keep FAMILY out of the superfamily merge",
@@ -538,7 +543,7 @@ def finalize_args(args: argparse.Namespace) -> None:
     if mode == "individual":
         args.grouping_mode = "individual"
     elif mode == "family":
-        args.grouping_mode = "conservative" if getattr(args, "safe_max", False) else "family"
+        args.grouping_mode = "conservative" if getattr(args, "no_cluster", False) else "family"
     elif mode == "superfamily":
         args.grouping_mode = "superfamily"
     # probe: grouping_mode is unused downstream (variation_probe.py doesn't group)

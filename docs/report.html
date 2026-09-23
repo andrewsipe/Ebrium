@@ -18,7 +18,7 @@
         <a href="concepts.html">Concepts</a>
         <a href="logic.html">How it thinks</a>
         <a href="flags.html">Flags</a>
-        <a href="terminal.html">Terminal</a>
+        <a href="terminal.html">Reading a run</a>
         <a href="report.html" aria-current="page">Report lookup</a>
       </nav>
       <a class="github-link" href="https://github.com/andrewsipe/ebrium">GitHub</a>
@@ -60,7 +60,7 @@ Font Sans (3 fonts)
         </tr>
         <tr>
           <td><span class="term">Driven by: file (asc: …)</span></td>
-          <td>The style with the tallest ascenders — usually the one setting the family ceiling.</td>
+          <td>The font with the tallest measured ascenders. The planned family ascender can still come from cap height plus headroom, rather than that font’s ascender alone.</td>
         </tr>
         <tr>
           <td><code>↑</code> … pulled up by family</td>
@@ -84,7 +84,7 @@ Font Sans (3 fonts)
         </tr>
         <tr>
           <td>single-font families skipped</td>
-          <td>No pull analysis when there’s only one font in the group.</td>
+          <td>No pull analysis when the group has one font — there is no second style to compare. The font is still normalized on a normal run.</td>
         </tr>
       </tbody>
     </table>
@@ -92,9 +92,9 @@ Font Sans (3 fonts)
     <h2>What to do next</h2>
     <ul>
       <li><strong>Pulls look fine</strong> — drop <code>--report</code> and run with <code>-y</code> if you’re ready, or leave the prompt on.</li>
-      <li><strong>One style is dragged hard</strong> — process it with <code>individual</code>, or exclude it from measuring / combine differently.</li>
-      <li><strong>Whole family too aggressive</strong> — tighten <code>--max-adjustment</code>, or inspect clustering with/without <code>--safe-max</code>.</li>
-      <li><strong>Names grouped wrong</strong> — <code>--ignore-term</code>, <code>--combine</code>, or switch to <code>superfamily</code> / <code>--exclude</code>.</li>
+      <li><strong>One style is dragged hard</strong> — process it with <code>individual</code>, or exclude it from measuring / group it differently.</li>
+      <li><strong>Whole family too aggressive</strong> — tighten <code>--max-adjustment</code>, or inspect clustering with/without <code>--no-cluster</code>.</li>
+      <li><strong>Names grouped wrong</strong> — <code>--ignore-term</code>, <code>--merge</code>, or switch to <code>superfamily</code> / <code>--exclude</code>.</li>
     </ul>
 
     <div class="callout">

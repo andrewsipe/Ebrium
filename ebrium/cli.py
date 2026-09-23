@@ -272,14 +272,15 @@ def main() -> None:
     save_measurements_checkpoint(measures, checkpoint_path, config=config)
 
     cs.emit("", console=console)
-    # Collect forced groups from --combine argument
+    # Collect forced groups from --merge (one complete group per flag)
     forced_groups = []
     if args.combine:
         for group_str in args.combine:
             families = [name.strip() for name in group_str.split(",")]
             if len(families) < 2:
                 cs.StatusIndicator("warning").add_message(
-                    f"--combine requires at least 2 families, skipping: {group_str}"
+                    f'--merge needs at least 2 families in one flag, skipping "{group_str}". '
+                    "Each --merge is its own group: -m A -m B does not merge A with B."
                 ).emit(console)
                 continue
             forced_groups.append(families)

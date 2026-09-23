@@ -18,7 +18,7 @@
         <a href="concepts.html">Concepts</a>
         <a href="logic.html" aria-current="page">How it thinks</a>
         <a href="flags.html">Flags</a>
-        <a href="terminal.html">Terminal</a>
+        <a href="terminal.html">Reading a run</a>
         <a href="report.html">Report lookup</a>
       </nav>
       <a class="github-link" href="https://github.com/andrewsipe/ebrium">GitHub</a>
@@ -37,7 +37,7 @@
       </li>
       <li>
         <span class="term">Cluster</span>
-        Optically identical styles share a core plan. Outliers (decorative / script span, mis-detected metrics) can sit outside the main cluster. Skipped entirely under <code>individual</code> and under <code>family --safe-max</code>.
+        Optically identical styles share a core plan. Outliers (decorative / script span, mis-detected metrics) can sit outside the main cluster. Skipped entirely under <code>individual</code> and under <code>family --no-cluster</code>.
       </li>
       <li>
         <span class="term">Plan</span>
@@ -63,7 +63,7 @@
         <tr>
           <td><code>family</code></td>
           <td>By family name</td>
-          <td>Yes (default); off with <code>--safe-max</code></td>
+          <td>Yes (default); off with <code>--no-cluster</code></td>
         </tr>
         <tr>
           <td><code>superfamily</code></td>
@@ -92,6 +92,9 @@
       </tbody>
     </table>
     <p><code>--line-box-from PATH_OR_GLOB</code> pins the reference font and implies <code>force-baseline</code> if you left the mode at <code>auto</code>. Single-font “families” skip force-baseline (nothing to unify).</p>
+
+    <h2>Variable fonts</h2>
+    <p><code>family</code>, <code>individual</code>, and <code>superfamily</code> read and write the default instance the same way they treat a static font. They do not rewrite MVAR or HVAR. If those tables move the line box as the axes change, the normalized default can drift. <code>probe</code> is the read-only check for that coverage. It does not measure or write.</p>
 
     <h2>What stays untouched</h2>
     <ul>

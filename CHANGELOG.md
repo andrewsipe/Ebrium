@@ -2,11 +2,18 @@
 
 ## Unreleased
 
+### Changed
+- `--safe-max` is now `--no-cluster`. It skips clustering under `family`;
+  the old flag still works and is hidden from `--help`.
+- `--combine` / `-c` is now `--merge` / `-m`. Each flag is still one complete
+  group (`--merge "A,B"`). `-m A -m B` does not merge A with B and warns.
+  The old spelling still works and is hidden from `--help`.
+
 ### Added
 - Static docs site under `docs/` for GitHub Pages (concepts, how it thinks,
-  flag reference, `--report` lookup). README slimmed to install + quick start
-  with a Docs link; `project.urls.Documentation` and CLI `DOCS_URL` point at
-  https://andrewsipe.github.io/ebrium/
+  flag reference, reading a run, `--report` lookup). README slimmed to install
+  + quick start with a Docs link; `project.urls.Documentation` and CLI
+  `DOCS_URL` point at https://andrewsipe.github.io/ebrium/
 
 ## [3.2.2] - 2026-09-21
 
