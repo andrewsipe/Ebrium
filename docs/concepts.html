@@ -93,6 +93,19 @@
       <li>Line gaps are set to <strong>zero</strong> across typo and hhea.</li>
     </ul>
 
+    <h2>Where the line box comes from</h2>
+    <p>The default plan follows the <a href="https://googlefonts.github.io/gf-guide/metrics.html">Google Fonts vertical metrics</a> pattern, which <a href="https://writingsystems.info/topics/fonts/line-metrics/">SIL’s line-metrics guide</a> calls the recommended strategy and which <a href="https://glyphsapp.com/learn/vertical-metrics">Glyphs</a> documents as the Google strategy:</p>
+    <ul>
+      <li>Typo and hhea are the same numbers. That is the line box.</li>
+      <li>Both line gaps are 0. The box itself is the line spacing.</li>
+      <li><code>USE_TYPO_METRICS</code> is on, so apps use that box instead of the Win values.</li>
+      <li>Win is the clipping box. It may be taller than the line box, and it is never shorter than the outlines it has to cover.</li>
+      <li>Styles in a family share one line box, so switching weight or italic does not change the line spacing of a paragraph.</li>
+    </ul>
+    <p>Those guides set the line box by looking at the common letters and adjusting until the spacing looks right. ebrium replaces that step with a formula. The box starts at the measured cap height plus 25% of the em of headroom. If that span is under 130% of the em, it grows until it meets the floor. The extra space is split 60% above the baseline and 40% below. A large x-height can raise the floor. Win is the family’s outline extremes plus 2%, then raised again if the line box is taller. A script or decorative face can widen Win without pulling the family’s line box up to that extreme — the same idea as not letting one rare tall glyph set the spacing, done from the measurements instead of by hand.</p>
+    <p>The box is one set of numbers for the whole family, anchored on cap height. <a href="https://typedrawers.com/discussion/4554/on-vertical-metrics-in-the-context-of-a-biscript-tamil-and-latin-font">John Hudson’s note on Tamil and Latin</a> and the SIL guide both point out that two scripts in one file often want different line spacing, and OpenType still stores a single set. ebrium does not add a second one.</p>
+    <p><a href="https://kltf.de/files/FontMetrics-kltf.pdf">Karsten Lücke’s font-metrics notes</a> are the history behind the older rule that the typo span had to equal the em. That rule is no longer in the spec, and the default 130% floor does not follow it.</p>
+
     <h2>Letter height &amp; top margin</h2>
     <p><code>--letter-height</code> (default 130% of UPM) is a <strong>floor</strong> for the letter span when auto-adjust is on — large x-heights may raise it. <code>--top-margin</code> (default 25%) asks for headroom above capitals; it can be ignored when actual ascenders already clear it. Use <code>--no-auto-adjust</code> for exactly the percentages you typed.</p>
 
