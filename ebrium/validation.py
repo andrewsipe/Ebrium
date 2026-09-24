@@ -2,25 +2,15 @@
 
 import sys
 import argparse
-from pathlib import Path
-from typing import Dict, List, Tuple
 
 import FontCore.core_console_styles as cs
 from FontCore.core_console_styles import get_console
 
-from . import config
-from . import models
 from . import planning
 
 console = get_console()
-MetricsConfig = config.MetricsConfig
-FontMeasures = models.FontMeasures
 
-# Import planning functions
 analyze_family_impact = planning.analyze_family_impact
-compute_family_normalized_extremes = planning.compute_family_normalized_extremes
-compute_family_normalized_ascender = planning.compute_family_normalized_ascender
-detect_uniwidth_family = planning.detect_uniwidth_family
 
 
 def validate_args(args: argparse.Namespace) -> None:
@@ -192,198 +182,43 @@ def report_changes(families, plans, args, forced_groups) -> bool:
             family_label += " [darktext.dim](uniwidth)[/darktext.dim]"
 
         # Adjust label for individual mode
-        field_label = "Font" if args.grouping_mode == "individual" else "Family"
-        font_count_text = (
-            ""
-            if args.grouping_mode == "individual"
-            else f"[darktext.dim]({cs.fmt_count(num_fonts)} fonts)[/darktext.dim]"
-        )
+        verbose = int(getattr(args, "verbose", 0) or 0)
+        style_word = "style" if num_fonts == 1 else "styles"
+        if verbose >= 1:
+            upms = {fm.upm for fm in group}
+            upm_note = str(next(iter(upms))) if len(upms) == 1 else "mixed"
+            detail = f" (planned ascender {fam_asc:.3f} · UPM {upm_note})"
+        else:
+            detail = ""
 
         if not has_changes or avg_typo < 0.1:
             cs.StatusIndicator("info").add_message(
-                f"[field]{field_label}:[/field] {family_label} "
-                f"{font_count_text} — No changes needed"
+                f"{family_label} — {cs.fmt_count(num_fonts)} {style_word} already share a plan{detail}"
             ).emit(console)
-            cs.StatusIndicator("unchanged").add_message("Already normalized").emit(
-                console
-            )
             continue
 
         any_changes_needed = True
 
         if avg_typo < 2.0:
-            impact_type, impact_desc = "minimal", "Minimal Normalization"
+            impact_type = "minimal"
         elif avg_typo < 8.0:
-            impact_type, impact_desc = "moderate", "Moderate Normalization"
+            impact_type = "moderate"
         else:
-            impact_type, impact_desc = "major", "Major Normalization"
+            impact_type = "major"
 
         if abs(avg_span) < 1.0:
-            span_info = "preserving vertical height"
+            span_info = "Line spacing stays about the same, gaps removed"
         elif avg_span > 0:
-            span_info = f"increasing vertical height by [count]{avg_span:.1f}[/count]%"
+            span_info = f"Line spacing grows by ~[count]{avg_span:.0f}[/count]%, gaps removed"
         else:
-            span_info = f"reducing vertical height by [count]{avg_span:.1f}[/count]%"
+            span_info = f"Line spacing shrinks by ~[count]{abs(avg_span):.0f}[/count]%, gaps removed"
+        if verbose >= 1:
+            span_info += f" (edges moved ~[count]{avg_typo:.0f}[/count]% of the em)"
 
         cs.StatusIndicator("info").add_message(
-            f"[field]{field_label}:[/field] {family_label} "
-            f"{font_count_text} — {impact_desc}"
+            f"{family_label} — {cs.fmt_count(num_fonts)} {style_word} matched, one shared plan{detail}"
         ).emit(console)
-
-        cs.StatusIndicator(impact_type).add_message(
-            f"UPM scaled by ~[count]{avg_typo:.1f}[/count]%, {span_info} [info]|[/info] linegap set to {cs.fmt_count(0)}"
-        ).emit(console)
+        cs.StatusIndicator(impact_type).add_message(span_info).emit(console)
 
     return any_changes_needed
 
-
-def generate_family_report(
-    families: Dict[str, List[FontMeasures]],
-    config: MetricsConfig,
-    args: argparse.Namespace,
-) -> None:
-    """Generate detailed report comparing family vs per-font calculations.
-
-    Example output:
-        Font Sans (3 fonts)
-
-          Family ascender: 0.8200 (normalized)
-          Driven by: Sans-Black.ttf (asc: 820)
-
-          ↑ Sans-Regular.ttf    + 70 units (+8.5%) - pulled up by family
-          ↑ Sans-Bold.ttf       + 50 units (+6.5%) - pulled up by family
-          ✓ Sans-Black.ttf      ±  0 units (+0.0%) - minimal impact
-
-          ⚠️  High normalization impact detected (8.5% max pull)
-              Consider using --per-font for heavily affected fonts
-              Or use --max-pull 6.8 to limit pulling
-    """
-
-    cs.emit("")
-    cs.StatusIndicator("info").add_message("Family Normalization Impact Report").emit(
-        console
-    )
-    cs.emit("")
-
-    for fam_name, group in families.items():
-        if len(group) == 1:
-            continue  # Skip single-font families
-
-        cs.emit(
-            f"[bold]{fam_name}[/bold] ({cs.fmt_count(len(group))} fonts)",
-            console=console,
-        )
-        cs.emit("")
-
-        # Calculate family-wide metrics
-        fam_min, fam_max = compute_family_normalized_extremes(group)
-        family_asc = compute_family_normalized_ascender(group, config)
-
-        # Track pulling effects
-        pulls: List[Tuple[FontMeasures, float, float, int]] = []
-
-        for fm in group:
-            # Calculate what this font would get individually
-            solo_asc = compute_family_normalized_ascender([fm], config)
-
-            # Calculate normalized difference
-            family_value = int(family_asc * fm.upm)
-            solo_value = int(solo_asc * fm.upm)
-            diff_units = family_value - solo_value
-            diff_percent = (
-                ((family_asc - solo_asc) / solo_asc * 100) if solo_asc > 0 else 0
-            )
-
-            pulls.append((fm, diff_percent, solo_asc, diff_units))
-
-        # Sort by impact (most pulled first)
-        pulls.sort(key=lambda x: abs(x[1]), reverse=True)
-
-        # Find the "driver" (font with tallest ascenders)
-        driver = max(
-            group,
-            key=lambda fm: (fm.ascender_max or 0) / fm.upm if fm.upm > 0 else 0,
-        )
-
-        cs.emit(
-            f"  [dim]Family ascender:[/dim] {family_asc:.4f} (normalized)",
-            console=console,
-        )
-        cs.emit(
-            f"  [dim]Driven by:[/dim] {Path(driver.path).name} (asc: {driver.ascender_max})",
-            console=console,
-        )
-        cs.emit("")
-
-        # Report per-font impact
-        for fm, diff_pct, solo_asc, diff_units in pulls:
-            filename = Path(fm.path).name
-
-            if abs(diff_pct) < 1.0:
-                # Minimal change
-                indicator = "✓"
-                style = "dim"
-                msg = f"±{abs(diff_units):>4} units ({diff_pct:+.1f}%) - minimal impact"
-            elif diff_units > 0:
-                # Pulled up
-                indicator = "↑"
-                style = "warning"
-                msg = f"+{diff_units:>4} units ({diff_pct:+.1f}%) - pulled up by family"
-            else:
-                # Pulled down (rare)
-                indicator = "↓"
-                style = "info"
-                msg = f"{diff_units:>4} units ({diff_pct:.1f}%) - pulled down by family"
-
-            cs.emit(
-                f"  [{style}]{indicator}[/{style}] {filename:40s} {msg}",
-                console=console,
-            )
-
-        cs.emit("")
-
-        # Recommendation
-        max_pull = max(abs(p[1]) for p in pulls)
-        if max_pull > 8.0:
-            cs.StatusIndicator("warning").add_message(
-                f"⚠️  High normalization impact detected ({max_pull:.1f}% max adjustment)"
-            ).add_item(
-                "Consider the individual subcommand for heavily affected fonts", indent_level=1
-            ).add_item(
-                f"Or use --max-adjustment {max_pull * 0.8:.1f} to limit adjustment",
-                indent_level=1,
-            ).emit(console)
-
-        cs.emit("")
-
-    # Uniwidth summary across all families
-    uniwidth_families = [
-        (fam, group) for fam, group in families.items()
-        if any(fm.is_uniwidth for fm in group)
-    ]
-    if uniwidth_families:
-        cs.emit("")
-        cs.StatusIndicator("info").add_message(
-            f"[bold]Uniwidth families:[/bold] {cs.fmt_count(len(uniwidth_families))}"
-        ).emit(console)
-        for fam, group in uniwidth_families:
-            _, uni_score, uni_consistent, uni_total = detect_uniwidth_family(
-                group, config.uniwidth_consistency_threshold
-            )
-            if uni_total > 0:
-                cs.emit(
-                    f"  {fam}: {uni_score:.0%} consistency "
-                    f"({uni_consistent}/{uni_total} glyphs, {len(group)} fonts)",
-                    console=console,
-                )
-        cs.emit(
-            "  [dim]Vertical metrics normalization reinforces uniwidth design intent[/dim]",
-            console=console,
-        )
-
-    # Summary: report single-font families that were skipped
-    single_font_families = [fam for fam, group in families.items() if len(group) == 1]
-    if single_font_families:
-        cs.StatusIndicator("info").add_message(
-            f"{cs.fmt_count(len(single_font_families))} single-font families skipped (no pulling analysis needed)"
-        ).emit(console)

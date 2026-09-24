@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Report lookup · ebrium</title>
+  <title>Reading probe · ebrium</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Sora:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet" />
@@ -19,7 +19,7 @@
         <a href="logic.html">How it thinks</a>
         <a href="flags.html">Flags</a>
         <a href="terminal.html">Reading a run</a>
-        <a href="report.html" aria-current="page">Report lookup</a>
+        <a href="report.html" aria-current="page">Reading probe</a>
       </nav>
       <a class="github-link" href="https://github.com/andrewsipe/ebrium">GitHub</a>
     </div>
@@ -27,19 +27,19 @@
 
   <main>
     <p class="meta">probe</p>
-    <h1>Report lookup</h1>
+    <h1>Reading probe</h1>
     <p class="lede">
       <code>ebrium probe</code> prints read-only metrics, one group at a time. Nothing is written to the fonts. The driver — the font with the tallest measured ascenders — is the magenta filename and the first row. The other rows run from the smallest pull to the largest.
     </p>
 
     <h2>Default</h2>
-    <p>Fits a half-width terminal. Cap height and x-height are measured from the outlines. Pull is how far sharing the family plan would move that font’s ascender compared with measuring it alone.</p>
+    <p>Fits a half-width terminal. Cap height and x-height are measured from the outlines. Shift is the clustered family plan. <code>No cluster</code> is the same comparison with clustering off. <code>--superfamily</code> shows only the clustered pull. <code>-v</code> restores the shorter names (<code>UPM</code>, <code>Cap</code>, <code>xHt</code>, <code>Pull</code>) and the unit counts.</p>
     <div class="report-sample" aria-label="Default probe table"><span class="hi">Sans — 3 fonts — driver Sans-Black.ttf</span>
 
-File               UPM   Cap  xHt  Pull
-<span class="ok">Sans-Black.ttf     1000  710  500  0u (+0.0%)</span>
-Sans-Bold.ttf      1000  705  490  +50u (+6.5%)
-Sans-Regular.ttf   1000  700  480  +70u (+8.5%)</div>
+File               Cap height  x-height  Shift
+<span class="ok">Sans-Black.ttf     710         500       0%</span>
+Sans-Bold.ttf      705         490       6.5% ↑
+Sans-Regular.ttf   700         480       8.5% ↑</div>
 
     <h2><code>-v</code></h2>
     <p>Adds a second table. <code>A/D/L</code> is ascender, descender, and line gap, in that order. Win is ascent and descent only. These are the values stored in the font now.</p>
@@ -72,9 +72,9 @@ Sans-Bold.ttf      800/-200/0    800/-200/0    820/205     set</div>
           <td>Measured height of the lowercase, from the baseline, in font units. The stored OS/2 field for this is <a href="https://learn.microsoft.com/en-us/typography/opentype/spec/os2#sxHeight"><code>sxHeight</code></a>. This column is the measurement, not that field.</td>
         </tr>
         <tr>
-          <td><code>Pull</code></td>
+          <td><code>Shift</code> (default), <code>Pull</code> (<code>-v</code>)</td>
           <td>family pull</td>
-          <td>How far sharing the family plan would move this font’s ascender, in units and as a percent, compared with measuring the font alone. The driver is <code>0u (+0.0%)</code>.</td>
+          <td>How far sharing the family plan would move this font’s ascender compared with measuring the font alone. The default shows a percent and an arrow. <code>-v</code> adds the unit count, such as <code>+70u (+8.5%)</code>. The driver is <code>0%</code>.</td>
         </tr>
         <tr>
           <td><code>hhea A/D/L</code><br /><code>hheaA</code> <code>hheaD</code> <code>hheaLG</code></td>

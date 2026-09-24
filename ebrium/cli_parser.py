@@ -482,7 +482,9 @@ def _build_probe(subparsers: Any) -> None:
     )
     g_mod.add_argument(
         "--superfamily", action="store_true",
-        help="group by shared name prefix instead of family name",
+        help="group by a shared name prefix. The default groups by family name "
+        "and clusters styles within each family. That table shows the clustered "
+        "pull and the pull with clustering off. Superfamily shows only the clustered pull",
     )
     _add_grouping_mod_args(p, g_mod)
     g_mod.add_argument(

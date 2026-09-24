@@ -14,6 +14,7 @@ from typing import Dict, List, Optional, Sequence, TextIO, Tuple
 
 import FontCore.core_console_styles as cs
 from FontCore.core_console_styles import get_console
+from FontCore.core_logging_config import Verbosity
 from fontTools.ttLib import TTFont
 
 from . import config
@@ -56,6 +57,8 @@ class ProbeRow:
     pull_units: Optional[int]
     pull_percent: Optional[float]
     is_driver: bool
+    nc_units: Optional[int] = None
+    nc_percent: Optional[float] = None
 
 
 def read_stored_metrics(path: str) -> Optional[StoredMetrics]:
@@ -93,7 +96,39 @@ def _driver(group: Sequence[FontMeasures]) -> FontMeasures:
     return max(group, key=key)
 
 
-def order_group(group: Sequence[FontMeasures], cfg: MetricsConfig) -> List[ProbeRow]:
+def _clear_targets(group: Sequence[FontMeasures]) -> None:
+    for fm in group:
+        fm.target_typo_asc = None
+        fm.target_typo_desc = None
+        fm.target_win_asc = None
+        fm.target_win_desc = None
+
+
+def _planned_ascenders(group: Sequence[FontMeasures], cfg: MetricsConfig, mode: str) -> Dict[str, Optional[int]]:
+    _clear_targets(group)
+    planning.build_plans(
+        {mode: list(group)},
+        cfg,
+        verbosity=Verbosity.QUIET,
+        grouping_mode=mode,
+    )
+    return {fm.path: fm.target_typo_asc for fm in group}
+
+
+def _pull_from(planned: Optional[int], solo: Optional[int]) -> Tuple[Optional[int], Optional[float]]:
+    if planned is None or solo is None:
+        return None, None
+    units = planned - solo
+    percent = (units / solo * 100.0) if solo else 0.0
+    return units, percent
+
+
+def order_group(
+    group: Sequence[FontMeasures],
+    cfg: MetricsConfig,
+    *,
+    no_cluster: bool,
+) -> List[ProbeRow]:
     """Driver first, then the rest from the smallest pull to the largest."""
     stored = {fm.path: read_stored_metrics(fm.path) for fm in group}
     surveys = {}
@@ -111,26 +146,30 @@ def order_group(group: Sequence[FontMeasures], cfg: MetricsConfig) -> List[Probe
     if len(group) < 2:
         fm = group[0]
         return [
-            ProbeRow(fm, stored[fm.path], surveys[fm.path], None, None, is_driver=True)
+            ProbeRow(fm, stored[fm.path], surveys[fm.path], None, None, True)
         ]
 
-    family_asc = planning.compute_family_normalized_ascender(list(group), cfg)
+    solo = {}
+    for fm in group:
+        solo[fm.path] = _planned_ascenders([fm], cfg, "individual").get(fm.path)
+    mode = "superfamily" if not no_cluster else "family"
+    clustered = _planned_ascenders(group, cfg, mode)
+    flat = _planned_ascenders(group, cfg, "conservative") if no_cluster else {}
     driver = _driver(group)
     ranked: List[ProbeRow] = []
     for fm in group:
-        solo = planning.compute_family_normalized_ascender([fm], cfg)
-        family_value = int(round(family_asc * fm.upm))
-        solo_value = int(round(solo * fm.upm))
-        diff_units = family_value - solo_value
-        diff_percent = ((family_asc - solo) / solo * 100.0) if solo > 0 else 0.0
+        units, percent = _pull_from(clustered.get(fm.path), solo.get(fm.path))
+        nc_units, nc_percent = _pull_from(flat.get(fm.path), solo.get(fm.path))
         ranked.append(
             ProbeRow(
                 fm,
                 stored[fm.path],
                 surveys[fm.path],
-                diff_units,
-                diff_percent,
-                is_driver=fm.path == driver.path,
+                units,
+                percent,
+                fm.path == driver.path,
+                nc_units if no_cluster else None,
+                nc_percent if no_cluster else None,
             )
         )
     ranked.sort(key=lambda row: (0 if row.is_driver else 1, abs(row.pull_percent or 0.0)))
@@ -149,11 +188,24 @@ def _use_typo(stored: Optional[StoredMetrics]) -> str:
     return "set" if stored.use_typo else "clear"
 
 
-def _pull_amount(row: ProbeRow) -> str:
-    if row.pull_units is None:
+def _fmt_pull(units: Optional[int], percent: Optional[float], *, verbose: int) -> str:
+    if units is None or percent is None:
         return "—"
-    sign = "+" if row.pull_units > 0 else ""
-    return f"{sign}{row.pull_units}u ({row.pull_percent:+.1f}%)"
+    if verbose < 1:
+        if abs(percent) < 0.05:
+            return "0%"
+        arrow = "↑" if percent > 0 else "↓"
+        return f"{abs(percent):.1f}% {arrow}"
+    sign = "+" if units > 0 else ""
+    return f"{sign}{units}u ({percent:+.1f}%)"
+
+
+def _pull_amount(row: ProbeRow, *, verbose: int) -> str:
+    return _fmt_pull(row.pull_units, row.pull_percent, verbose=verbose)
+
+
+def _nc_amount(row: ProbeRow, *, verbose: int) -> str:
+    return _fmt_pull(row.nc_units, row.nc_percent, verbose=verbose)
 
 
 def _stored_num(stored: Optional[StoredMetrics], name: str) -> str:
@@ -196,7 +248,11 @@ def collect_groups(files: Sequence[str], args) -> Dict[str, List[ProbeRow]]:
             forced_groups.append(families)
     families = grouping.group_families(args, measures, forced_groups)
     cfg = MetricsConfig()
-    return {name: order_group(group, cfg) for name, group in families.items()}
+    no_cluster = getattr(args, "grouping_mode", "family") != "superfamily"
+    return {
+        name: order_group(group, cfg, no_cluster=no_cluster)
+        for name, group in families.items()
+    }
 
 
 REPORT_COLUMNS = (
@@ -216,10 +272,12 @@ REPORT_COLUMNS = (
     "win_desc",
     "use_typo",
     "pull",
+    "pull_no_cluster",
     "sliders",
 )
 
-SCAN_HEADERS = ("File", "UPM", "Cap", "xHt", "Pull")
+SCAN_HEADERS = ("File", "Cap height", "x-height", "Shift")
+SCAN_HEADERS_TECH = ("File", "UPM", "Cap", "xHt", "Pull")
 METRIC_HEADERS = ("File", "hhea A/D/L", "sTypo A/D/L", "usWin A/D", "UseTypo")
 FULL_HEADERS = (
     "File",
@@ -259,15 +317,17 @@ def _pair(stored: Optional[StoredMetrics], asc: str, desc: str) -> str:
     return f"{getattr(stored, asc)}/{getattr(stored, desc)}"
 
 
-def scan_cells(row: ProbeRow) -> List[str]:
+def scan_cells(row: ProbeRow, *, verbose: int, no_cluster: bool) -> List[str]:
     fm = row.measure
-    return [
-        _file_label(row),
-        str(fm.upm),
-        _dash(fm.cap_height),
-        _dash(fm.x_height),
-        _pull_amount(row),
-    ]
+    name = _file_label(row)
+    shift = _pull_amount(row, verbose=verbose)
+    if verbose < 1:
+        cells = [name, _dash(fm.cap_height), _dash(fm.x_height), shift]
+    else:
+        cells = [name, str(fm.upm), _dash(fm.cap_height), _dash(fm.x_height), shift]
+    if no_cluster:
+        cells.append(_nc_amount(row, verbose=verbose))
+    return cells
 
 
 def metric_cells(row: ProbeRow) -> List[str]:
@@ -298,7 +358,8 @@ def full_cells(row: ProbeRow) -> List[str]:
         _stored_num(stored, "win_asc"),
         _stored_num(stored, "win_desc"),
         _use_typo(stored),
-        _pull_amount(row),
+        _pull_amount(row, verbose=1),
+        _nc_amount(row, verbose=1),
     ]
 
 
@@ -321,7 +382,8 @@ def row_values(group: str, row: ProbeRow) -> List[str]:
         _stored_num(stored, "win_asc"),
         _stored_num(stored, "win_desc"),
         _use_typo(stored),
-        _pull_amount(row),
+        _pull_amount(row, verbose=1),
+        _nc_amount(row, verbose=1),
         slider_note(row.survey),
     ]
 
@@ -347,11 +409,30 @@ def _print_one_table(title: str, headers: Sequence[str], rows: List[List[str]]) 
 def _print_table(group: str, rows: List[ProbeRow], *, verbose: int) -> None:
     console = get_console()
     driver = next((row for row in rows if row.is_driver), rows[0])
-    title = f"{group} — {len(rows)} font(s) — driver {Path(driver.measure.path).name}"
-    if verbose >= 2:
-        _print_one_table(title, FULL_HEADERS, [full_cells(row) for row in rows])
+    noun = "font" if verbose >= 1 else "style"
+    noun += "" if len(rows) == 1 else "s"
+    if verbose >= 1:
+        title = f"{group} — {len(rows)} {noun} — driver {Path(driver.measure.path).name}"
     else:
-        _print_one_table(title, SCAN_HEADERS, [scan_cells(row) for row in rows])
+        title = f"{group} — {len(rows)} {noun} — spacing set by {Path(driver.measure.path).name}"
+    no_cluster = any(row.nc_units is not None for row in rows)
+    if verbose >= 2:
+        headers = list(FULL_HEADERS)
+        cells = [full_cells(row) for row in rows]
+        if no_cluster:
+            headers.append("No cluster")
+        else:
+            cells = [row_cells[:-1] for row_cells in cells]
+        _print_one_table(title, headers, cells)
+    else:
+        headers = list(SCAN_HEADERS_TECH if verbose >= 1 else SCAN_HEADERS)
+        if no_cluster:
+            headers.append("No cluster")
+        _print_one_table(
+            title,
+            headers,
+            [scan_cells(row, verbose=verbose, no_cluster=no_cluster) for row in rows],
+        )
         if verbose >= 1:
             cs.emit("", console=console)
             _print_one_table(
