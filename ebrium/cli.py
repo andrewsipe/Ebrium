@@ -113,6 +113,7 @@ def main() -> None:
         force_baseline_from_pattern=(
             (getattr(args, "force_baseline_from", None) or "").strip() or None
         ),
+        springy_blend=(getattr(args, "blend", 40.0) or 0.0) / 100.0,
     )
 
     files = scan_fonts(args.paths or ["."], args.recursive, args.use_ttx)
@@ -308,7 +309,7 @@ def main() -> None:
         config,
         verbosity=verbosity,
         cached_clusters=cached_clusters,
-        grouping_mode=args.grouping_mode,
+        grouping_mode=getattr(args, "plan_mode", None) or args.grouping_mode,
         force_hhea=args.safe_hhea,
     )
 

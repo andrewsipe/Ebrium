@@ -112,3 +112,5 @@ class MetricsConfig:
     uniwidth_consistency_threshold: float = (
         0.90  # 90% of sampled glyphs must have identical advance widths
     )
+    # Springy plan: weight toward the 1300 attractor (0 = keep solo median, 1 = snap to attractor)
+    springy_blend: float = 0.4

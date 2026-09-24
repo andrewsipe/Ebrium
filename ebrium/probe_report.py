@@ -115,11 +115,13 @@ def _planned_ascenders(group: Sequence[FontMeasures], cfg: MetricsConfig, mode: 
     return {fm.path: fm.target_typo_asc for fm in group}
 
 
-def _pull_from(planned: Optional[int], solo: Optional[int]) -> Tuple[Optional[int], Optional[float]]:
-    if planned is None or solo is None:
+def _pull_from(planned: Optional[int], current: Optional[int], upm: int) -> Tuple[Optional[int], Optional[float]]:
+    """Change a plan would write, measured from the ascender stored in the file."""
+    if planned is None or current is None:
         return None, None
-    units = planned - solo
-    percent = (units / solo * 100.0) if solo else 0.0
+    units = planned - current
+    base = current if current else upm
+    percent = (units / base * 100.0) if base else 0.0
     return units, percent
 
 
@@ -143,23 +145,17 @@ def order_group(
         finally:
             font.close()
 
-    if len(group) < 2:
-        fm = group[0]
-        return [
-            ProbeRow(fm, stored[fm.path], surveys[fm.path], None, None, True)
-        ]
-
-    solo = {}
-    for fm in group:
-        solo[fm.path] = _planned_ascenders([fm], cfg, "individual").get(fm.path)
     mode = "superfamily" if not no_cluster else "family"
+    if len(group) < 2:
+        mode = "individual"
     clustered = _planned_ascenders(group, cfg, mode)
     flat = _planned_ascenders(group, cfg, "conservative") if no_cluster else {}
     driver = _driver(group)
     ranked: List[ProbeRow] = []
     for fm in group:
-        units, percent = _pull_from(clustered.get(fm.path), solo.get(fm.path))
-        nc_units, nc_percent = _pull_from(flat.get(fm.path), solo.get(fm.path))
+        current = stored[fm.path].typo_asc if stored[fm.path] else None
+        units, percent = _pull_from(clustered.get(fm.path), current, fm.upm)
+        nc_units, nc_percent = _pull_from(flat.get(fm.path), current, fm.upm)
         ranked.append(
             ProbeRow(
                 fm,

@@ -12,6 +12,7 @@ This version has one subcommand per branch:
   ebrium individual  [options] PATH...   -- each font normalized alone
   ebrium family      [options] PATH...   -- group by family, optional --no-cluster
   ebrium superfamily [options] PATH...   -- merge shared-prefix families
+  ebrium springy     [options] PATH...   -- experimental soft-span peer plan
   ebrium probe       [options] PATH...   -- read-only line-box and clipping report
                                              (was --probe-variation-metrics;
                                              it never touched grouping,
@@ -93,6 +94,7 @@ MODE_SUMMARY = {
     "individual": "normalize each font on its own; no grouping or clustering",
     "family": "group by family name; cluster within each family (add --no-cluster to skip clustering)",
     "superfamily": "merge families sharing a name prefix; cluster across the superfamily",
+    "springy": "experimental: solo spring → peer median → soft pull toward 130% UPM (shared typo)",
     "probe": "read-only metrics tables: geometry, stored metrics, family pull, and variable-font slider facts",
 }
 
@@ -449,6 +451,88 @@ def _build_superfamily(subparsers: Any) -> None:
     _add_general_args(g_gen, "verbose output; -vv for debug output")
 
 
+def _build_springy(subparsers: Any) -> None:
+    p = subparsers.add_parser(
+        "springy",
+        usage="%(prog)s [options] [PATH ...]",
+        allow_abbrev=False,
+        description=(
+            "Experimental soft-span plan: each style springs solo toward ~130% UPM "
+            "(x-height may nudge the attractor), the peer median is blended toward "
+            "that attractor, and the group shares one typo box. Win uses outline "
+            "extremes. Script/decorative faces inherit typo and do not pull the median."
+        ),
+        add_help=False,
+    )
+    g_in = p.add_argument_group("input")
+    g_run = p.add_argument_group("preview and confirmation")
+    g_peer = p.add_argument_group("peer set")
+    g_mod = p.add_argument_group("grouping modifiers (repeatable)")
+    g_spring = p.add_argument_group("spring")
+    g_det = p.add_argument_group("detection overrides (filename globs, repeatable)")
+    g_space = p.add_argument_group("vertical spacing (% of UPM)")
+    g_gen = p.add_argument_group("general")
+
+    examples = [
+        ("ebrium springy fonts/ -r", "springy plan by family name"),
+        ("ebrium springy fonts/ -r --superfamily", "merge shared-prefix families (VF + statics)"),
+        ("ebrium springy fonts/ -r -n", "preview without writing"),
+        ("ebrium springy fonts/ -r --blend 40", "40% pull toward the 130% attractor (default)"),
+        ("ebrium springy fonts/ -r --blend 0", "use the solo-median span only (no attractor pull)"),
+    ]
+    notes = [
+        CHECKPOINT_NOTE,
+        COMBINE_NOTE,
+        "Default peer set is family name. Use --superfamily when a variable font "
+        "and its extracted statics should share one box (e.g. Register + Register Variable).",
+        "--blend is the weight toward the letter-height attractor (default 40). "
+        "0 keeps the median of solo springs; 100 snaps to the attractor.",
+    ]
+
+    _add_help(
+        g_gen,
+        panel=safety_panel(message=PANEL_MESSAGE, rows=PANEL_ROWS_BASIC),
+        inline={
+            "detection overrides (filename globs, repeatable)": choices_section(
+                "--assume types", ASSUME_TYPES
+            ),
+        },
+        footer=[
+            examples_section(examples),
+            notes_section(notes),
+            exit_status_section(EXIT_CODES),
+            line_section("formats", FORMATS_LINE),
+            docs_section(DOCS_URL),
+        ],
+    )
+    _add_input_args(g_in)
+    _add_preview_args(g_run)
+    g_peer.add_argument(
+        "--superfamily",
+        action="store_true",
+        help="merge families that share a name prefix into one peer set "
+        "(default groups by family name only)",
+    )
+    _add_grouping_mod_args(p, g_mod)
+    # --exclude only meaningful with prefix merge
+    g_mod.add_argument(
+        "--exclude",
+        action="append",
+        metavar="FAMILY",
+        help="with --superfamily, keep FAMILY out of the prefix merge",
+    )
+    g_spring.add_argument(
+        "--blend",
+        type=float,
+        default=40.0,
+        metavar="PCT",
+        help="percent weight toward the letter-height attractor (default: 40)",
+    )
+    _add_detection_args(p, g_det)
+    _add_spacing_args(g_space, include_max_adjustment=False)
+    _add_general_args(g_gen, "verbose output; -vv for debug output")
+
+
 def _build_probe(subparsers: Any) -> None:
     p = subparsers.add_parser(
         "probe",
@@ -513,7 +597,7 @@ def _build_probe(subparsers: Any) -> None:
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog=PROG,
-        usage="%(prog)s {individual,family,superfamily,probe} [options] [PATH ...]",
+        usage="%(prog)s {individual,family,superfamily,springy,probe} [options] [PATH ...]",
         allow_abbrev=False,
         description=(
             "Normalize vertical metrics across fonts without changing unitsPerEm "
@@ -543,6 +627,7 @@ def build_parser() -> argparse.ArgumentParser:
     _build_individual(subparsers)
     _build_family(subparsers)
     _build_superfamily(subparsers)
+    _build_springy(subparsers)
     _build_probe(subparsers)
     return p
 
@@ -557,13 +642,24 @@ def finalize_args(args: argparse.Namespace) -> None:
     """
     mode = args.mode
 
-    if mode == "individual":
+    # springy: peer set is family or superfamily; planning uses grouping_mode "springy"
+    args.springy = mode == "springy"
+    if mode == "springy":
+        peer = "superfamily" if getattr(args, "superfamily", False) else "family"
+        args.grouping_mode = peer
+        args.plan_mode = "springy"
+    elif mode == "individual":
         args.grouping_mode = "individual"
+        args.plan_mode = "individual"
     elif mode == "family":
         args.grouping_mode = "conservative" if getattr(args, "no_cluster", False) else "family"
+        args.plan_mode = args.grouping_mode
     elif mode == "superfamily":
         args.grouping_mode = "superfamily"
-    # probe: grouping_mode is unused downstream (variation_probe.py doesn't group)
+        args.plan_mode = "superfamily"
+    else:
+        # probe
+        args.plan_mode = None
 
     line_box = getattr(args, "line_box", "auto")
     args.force_baseline_main_cluster = line_box == "force-baseline-main-cluster"
@@ -600,3 +696,10 @@ def finalize_args(args: argparse.Namespace) -> None:
     args.assume_decorative = buckets["decorative"] or None
     args.assume_unicase = buckets["unicase"] or None
     args.assume_uniwidth = buckets["uniwidth"] or None
+
+    if not hasattr(args, "blend"):
+        args.blend = 40.0
+    if not hasattr(args, "springy"):
+        args.springy = False
+    if not hasattr(args, "plan_mode"):
+        args.plan_mode = getattr(args, "grouping_mode", None)

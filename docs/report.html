@@ -33,7 +33,7 @@
     </p>
 
     <h2>Default</h2>
-    <p>Fits a half-width terminal. Cap height and x-height are measured from the outlines. Shift is the clustered family plan. <code>No cluster</code> is the same comparison with clustering off. <code>--superfamily</code> shows only the clustered pull. <code>-v</code> restores the shorter names (<code>UPM</code>, <code>Cap</code>, <code>xHt</code>, <code>Pull</code>) and the unit counts.</p>
+    <p>Fits a half-width terminal. Cap height and x-height are measured from the outlines. Shift is how far a family run would move the stored ascender. <code>0%</code> means that run would leave it. <code>No cluster</code> is the same measurement for <code>family --no-cluster</code>. <code>--superfamily</code> shows only the clustered pull. <code>-v</code> restores the shorter names (<code>UPM</code>, <code>Cap</code>, <code>xHt</code>, <code>Pull</code>) and the unit counts.</p>
     <div class="report-sample" aria-label="Default probe table"><span class="hi">Sans — 3 fonts — driver Sans-Black.ttf</span>
 
 File               Cap height  x-height  Shift
@@ -74,7 +74,7 @@ Sans-Bold.ttf      800/-200/0    800/-200/0    820/205     set</div>
         <tr>
           <td><code>Shift</code> (default), <code>Pull</code> (<code>-v</code>)</td>
           <td>family pull</td>
-          <td>How far sharing the family plan would move this font’s ascender compared with measuring the font alone. The default shows a percent and an arrow. <code>-v</code> adds the unit count, such as <code>+70u (+8.5%)</code>. The driver is <code>0%</code>.</td>
+          <td>How far the ascender stored in the file would move if that plan were applied. <code>0%</code> means the file already matches. <code>Shift</code> is a normal family run. <code>No cluster</code> is <code>family --no-cluster</code>. The default shows a percent and an arrow. <code>-v</code> adds the unit count.</td>
         </tr>
         <tr>
           <td><code>hhea A/D/L</code><br /><code>hheaA</code> <code>hheaD</code> <code>hheaLG</code></td>

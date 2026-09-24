@@ -1037,6 +1037,15 @@ def build_plans(
             )
             continue
 
+        if grouping_mode == "springy":
+            from .springy import plan_springy_group
+
+            fam_min, fam_max, shared_asc = plan_springy_group(
+                group, config, verbosity=verbosity, fam=fam
+            )
+            family_plans[fam] = (fam_min, fam_max, shared_asc)
+            continue
+
         # Report unicase detection
         unicase_count = sum(1 for fm in group if fm.is_unicase)
         non_unicase_count = len(group) - unicase_count
@@ -1345,7 +1354,8 @@ def build_plans(
                         f"{(main_cluster[0].cap_height or 0) / main_cluster[0].upm:.3f})"
                     )
                 cluster_msg += f" | {upm_info}"
-                cs.StatusIndicator("info").add_message(cluster_msg).emit(console)
+                if verbosity >= Verbosity.BRIEF:
+                    cs.StatusIndicator("info").add_message(cluster_msg).emit(console)
 
             # Check if max_adjustment limit should override family normalization
             fonts_exceeding_limit: List[Tuple[FontMeasures, float]] = []
