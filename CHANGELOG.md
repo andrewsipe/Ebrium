@@ -8,12 +8,29 @@
 - `--combine` / `-c` is now `--merge` / `-m`. Each flag is still one complete
   group (`--merge "A,B"`). `-m A -m B` does not merge A with B and warns.
   The old spelling still works and is hidden from `--help`.
+- Parser helpers no longer annotate argparse's private `_ArgumentGroup` and
+  `_SubParsersAction` types.
+- `probe` now reports whether the typo line box already moves, and whether
+  a flat Win clipping box is overflowed at an axis pole past the default
+  ink. The run ends with a tally. HVAR is no longer part of the report.
+- `probe` is a metrics report, not an adjustment. Each font gets its em,
+  sliders, whether line spacing stays put, where the default outlines and
+  the clipping box sit, and whether a slider end passes that box.
+- `probe -q` shows the current filename and a progress bar, then the tally.
+  `probe -o FILE` writes a tab-separated row per font as the run goes.
+  A relative file is saved at the top of the directory that was probed.
 
 ### Added
 - Static docs site under `docs/` for GitHub Pages (concepts, how it thinks,
   flag reference, reading a run, `--report` lookup). README slimmed to install
   + quick start with a Docs link; `project.urls.Documentation` and CLI
-  `DOCS_URL` point at https://andrewsipe.github.io/ebrium/
+  `DOCS_URL` point at https://www.andrewsipe.com/Ebrium/
+- Docs now say that `family`, `individual`, and `superfamily` rewrite a
+  variable font's default instance only and leave MVAR/HVAR alone. `probe`
+  is the read-only coverage check.
+- Fixture tests: one TTF through measure, plan, and write, plus a variable
+  font whose MVAR/HVAR bytes stay put. Parser tests cover `--no-cluster` /
+  `--merge` and the hidden old spellings.
 
 ## [3.2.2] - 2026-09-21
 

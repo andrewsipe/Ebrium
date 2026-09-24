@@ -1,13 +1,22 @@
-"""Read-only MVAR/HVAR inspection for variable fonts.
+"""Read-only variable-font report for the line box and the Win clipping box.
 
-Uses the same VarStoreInstancer + normalized location path as fontTools.varLib.mutator.
-Does not modify fonts. Intended to decide whether MVAR/HVAR encode meaningful deltas
-before any normalization logic consumes them."""
+Samples the default instance and each axis pole (other axes left at their
+defaults). Does not modify fonts. ``--output`` writes a tab-separated report.
+Two questions:
+
+- Typo line box (MVAR hasc / hdsc / hlgp): if it already moves, leave it.
+- Win clipping box (usWinAscent / usWinDescent): if hcla / hcld are flat and a
+  pole's ink sticks out past both the Win box and the default instance's ink,
+  that is the only adjustment worth considering later.
+"""
 
 from __future__ import annotations
 
+import csv
+import os
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
+from typing import Dict, Iterable, List, Mapping, Optional, Sequence, TextIO, Tuple
 
 import FontCore.core_console_styles as cs
 from FontCore.core_console_styles import get_console
@@ -18,10 +27,12 @@ from fontTools.varLib.mvar import MVAR_ENTRIES
 from fontTools.varLib.models import normalizeLocation, piecewiseLinearMap
 from fontTools.varLib.varStore import NO_VARIATION_INDEX, VarStoreInstancer
 
-# Tags most relevant to ebrium-style vertical typo / line box (+ Win fallbacks).
-MVAR_VERTICAL_LINE_TAGS = frozenset(
-    {"hasc", "hdsc", "hlgp", "hcla", "hcld", "xhgt", "cpht"}
-)
+# Typo line box. A non-zero range means the design already moves it.
+LINE_BOX_TAGS = ("hasc", "hdsc", "hlgp")
+# Win clipping box. A non-zero range means clipping is already adjusted.
+CLIP_TAGS = ("hcla", "hcld")
+# Measured heights. They follow the outlines; they are not a line-box edit.
+MEASURE_TAGS = ("xhgt", "cpht")
 
 
 def normalized_variation_location(
@@ -98,217 +109,618 @@ def mvar_aggregate_ranges(
     return ranges, unknown_tags
 
 
-def _sample_glyph_names(varfont: TTFont, limit: int = 200) -> List[str]:
-    order = list(varfont.getGlyphOrder())
-    cmap = varfont.getBestCmap() or {}
-    preferred: List[str] = []
-    for cp in list(range(0x0041, 0x005B)) + list(range(0x0061, 0x007B)) + list(
-        range(0x0030, 0x003A)
-    ):
-        gn = cmap.get(cp)
-        if gn and gn not in preferred:
-            preferred.append(str(gn))
-    for gn in order:
-        if gn and gn != ".notdef" and gn not in preferred:
-            preferred.append(str(gn))
-        if len(preferred) >= limit:
-            break
-    return preferred[:limit]
-
-
-def hvar_advance_delta_stats(
-    varfont: TTFont,
-    loc_norm: Dict[str, float],
-    glyph_names: Optional[Sequence[str]] = None,
-) -> Optional[Dict[str, object]]:
-    """Summarize advance-width deltas via HVAR at one location."""
-    if "HVAR" not in varfont:
-        return None
-    hvar = varfont["HVAR"].table
-    vstore = getattr(hvar, "VarStore", None)
-    if vstore is None:
-        return None
-
-    names = list(glyph_names) if glyph_names else _sample_glyph_names(varfont)
-    inst = VarStoreInstancer(vstore, varfont["fvar"].axes, loc_norm)
-    order = varfont.getGlyphOrder()
-    index_of = {str(g): i for i, g in enumerate(order)}
-
-    deltas: List[int] = []
-    skipped = 0
-    map_obj = getattr(hvar, "AdvWidthMap", None)
-    mapping = getattr(map_obj, "mapping", None) if map_obj is not None else None
-
-    for g in names:
-        if g not in index_of:
-            skipped += 1
+def _moving(ranges: Mapping[str, Tuple[int, int]], tags: Sequence[str]) -> List[Tuple[str, int, int]]:
+    found: List[Tuple[str, int, int]] = []
+    for tag in tags:
+        span = ranges.get(tag)
+        if span is None or (span[0] == 0 and span[1] == 0):
             continue
-        gid = index_of[g]
-        if mapping is not None:
-            if g not in mapping:
+        found.append((tag, span[0], span[1]))
+    return found
+
+
+def _span_text(moving: Sequence[Tuple[str, int, int]]) -> str:
+    return ", ".join(f"{tag} {lo:+d} to {hi:+d}" for tag, lo, hi in moving)
+
+
+def _cmap_names(font: TTFont) -> List[str]:
+    cmap = font.getBestCmap() or {}
+    names = [name for name in cmap.values() if isinstance(name, str)]
+    if names:
+        return names
+    return [name for name in font.getGlyphOrder() if name and name != ".notdef"]
+
+
+def instance_y_bounds(
+    font: TTFont, user_location: Mapping[str, float]
+) -> Optional[Tuple[int, int]]:
+    """Cmap glyph ink at one user-space location: (yMin, yMax)."""
+    try:
+        glyph_set = font.getGlyphSet(location=dict(user_location))
+    except Exception:
+        return None
+    from fontTools.pens.boundsPen import BoundsPen
+
+    min_y: Optional[int] = None
+    max_y: Optional[int] = None
+    for name in _cmap_names(font):
+        if name not in glyph_set:
+            continue
+        pen = BoundsPen(glyph_set)
+        try:
+            glyph_set[name].draw(pen)
+        except Exception:
+            continue
+        if pen.bounds is None:
+            continue
+        _, y0, _, y1 = pen.bounds
+        y0_i = int(otRound(y0))
+        y1_i = int(otRound(y1))
+        if min_y is None or y0_i < min_y:
+            min_y = y0_i
+        if max_y is None or y1_i > max_y:
+            max_y = y1_i
+    if min_y is None or max_y is None:
+        return None
+    return min_y, max_y
+
+
+@dataclass
+class PoleOverflow:
+    label: str
+    above: int
+    below: int
+    y_min: int
+    y_max: int
+
+
+@dataclass
+class Survey:
+    """One font, classified for the collection tally."""
+
+    clipping: str
+    line_box: str
+    axes_line: str = ""
+    line_box_text: str = ""
+    clipping_text: str = ""
+    upm: int = 0
+    overflows: List[PoleOverflow] = field(default_factory=list)
+    overflow_lines: List[str] = field(default_factory=list)
+    verbose_lines: List[str] = field(default_factory=list)
+    axes: List[Tuple[str, float, float, float]] = field(default_factory=list)
+    default_top: Optional[int] = None
+    default_bottom: Optional[int] = None
+    win_above: Optional[int] = None
+    win_below: Optional[int] = None
+    mvar_records: Optional[int] = None
+
+
+def _past_default(
+    pole: Tuple[int, int],
+    default: Tuple[int, int],
+    win_asc: int,
+    win_desc: int,
+) -> Tuple[int, int]:
+    """How far a pole sticks out past both the Win box and the default ink."""
+    dmin, dmax = default
+    pmin, pmax = pole
+    above = pmax - max(win_asc, dmax)
+    below = (-pmin) - max(win_desc, -dmin)
+    return above, below
+
+
+def _units_phrase(above: int, below: int) -> str:
+    parts: List[str] = []
+    if above > 0:
+        parts.append(f"{above} above")
+    if below > 0:
+        parts.append(f"{below} below")
+    return " and ".join(parts)
+
+
+def survey_font(font: TTFont) -> Survey:
+    """Classify a variable font. Static fonts (no fvar) get clipping 'static'."""
+    if "fvar" not in font:
+        return Survey(
+            clipping="static",
+            line_box="n/a",
+            clipping_text="no fvar — static font",
+        )
+
+    fvar = font["fvar"]
+    axes = [
+        (a.axisTag, float(a.minValue), float(a.defaultValue), float(a.maxValue))
+        for a in fvar.axes
+    ]
+    axes_line = ", ".join(
+        f"{tag} {lo:g}…{default:g}…{hi:g}" for tag, lo, default, hi in axes
+    )
+    samples = axis_pole_user_locations(font)
+    ranges: Dict[str, Tuple[int, int]] = {}
+    unknown: Dict[str, str] = {}
+    if "MVAR" in font:
+        ranges, unknown = mvar_aggregate_ranges(font, samples)
+
+    line_moving = _moving(ranges, LINE_BOX_TAGS)
+    if line_moving:
+        opsz_hit = False
+        for label, user_loc in samples:
+            if not label.startswith("opsz="):
                 continue
-            widx = mapping[g]
-        else:
-            widx = gid
-        if widx == NO_VARIATION_INDEX:
-            deltas.append(0)
-        else:
-            deltas.append(int(otRound(inst[widx])))
+            snap = mvar_delta_map(font, normalized_variation_location(font, user_loc))
+            if any(snap.get(tag, 0) != 0 for tag in LINE_BOX_TAGS):
+                opsz_hit = True
+                break
+        where = "moves on an optical-size pole" if opsz_hit else "moves"
+        line_box = "moves"
+        line_box_text = f"{where} — {_span_text(line_moving)}; leave it"
+    else:
+        line_box = "flat"
+        line_box_text = "flat"
 
-    nonz = [d for d in deltas if d != 0]
-    return {
-        "glyphs_checked": len(deltas),
-        "skipped_unmapped": skipped,
-        "nonzero_advances": len(nonz),
-        "max_abs_delta": max(abs(d) for d in deltas) if deltas else 0,
-        "mean_abs_nonzero": (sum(abs(x) for x in nonz) / len(nonz)) if nonz else 0.0,
-    }
+    clip_moving = _moving(ranges, CLIP_TAGS)
+    verbose_lines: List[str] = []
+    mvar_records = (
+        len(font["MVAR"].table.ValueRecord) if "MVAR" in font else None
+    )
+    measure_moving = _moving(ranges, MEASURE_TAGS)
+    if measure_moving:
+        verbose_lines.append(f"measured tags: {_span_text(measure_moving)}")
+    if unknown:
+        verbose_lines.append(f"unknown MVAR tags: {len(unknown)}")
 
-
-def probe_font_file(path: str, verbose: bool = False) -> None:
-    """Print MVAR/HVAR summary for one font path."""
-    console = get_console()
-    fp = Path(path)
-    try:
-        font = TTFont(str(fp))
-    except Exception as e:
-        cs.StatusIndicator("error").add_file(path, filename_only=False).with_explanation(
-            str(e)
-        ).emit(console)
-        return
-
-    try:
-        if "fvar" not in font:
-            cs.StatusIndicator("unchanged").add_file(path, filename_only=False).add_message(
-                "No fvar table — treat as static for variation metrics.",
-            ).emit(console)
-            return
-
-        fvar = font["fvar"]
-        axis_line = ", ".join(
-            f"{a.axisTag} [{a.minValue:g} … {a.defaultValue:g} … {a.maxValue:g}]"
-            for a in fvar.axes
+    os2 = font["OS/2"] if "OS/2" in font else None
+    if os2 is None:
+        return Survey(
+            clipping="unmeasured",
+            line_box=line_box,
+            axes_line=axes_line,
+            line_box_text=line_box_text,
+            clipping_text="no OS/2 table, so Win ascent and descent cannot be compared",
+            verbose_lines=verbose_lines,
         )
 
-        ind = (
-            cs.StatusIndicator("info")
-            .add_file(str(fp), filename_only=False)
-            .add_message(f"[dim]Axes:[/dim] {axis_line}")
+    win_asc = int(getattr(os2, "usWinAscent", 0) or 0)
+    win_desc = int(getattr(os2, "usWinDescent", 0) or 0)
+    upm = int(font["head"].unitsPerEm)
+    default_bounds = instance_y_bounds(font, samples[0][1])
+    if default_bounds is None:
+        return Survey(
+            clipping="unmeasured",
+            line_box=line_box,
+            axes_line=axes_line,
+            line_box_text=line_box_text,
+            clipping_text="could not measure the default instance",
+            verbose_lines=verbose_lines,
         )
 
-        samples = axis_pole_user_locations(font)
-        default_norm = normalized_variation_location(
-            font, samples[0][1]
-        )
-
-        if "MVAR" in font:
-            ranges, unknown = mvar_aggregate_ranges(font, samples)
-            nrec = len(font["MVAR"].table.ValueRecord)
-            ind.add_item(f"MVAR: {nrec} value record(s)", indent_level=1)
-
-            # Planning-relevant summary
-            vert_lines: List[str] = []
-            for tag in sorted(MVAR_VERTICAL_LINE_TAGS & set(ranges.keys())):
-                lo, hi = ranges[tag]
-                if lo == 0 and hi == 0:
-                    continue
-                entry = MVAR_ENTRIES.get(tag, ("?", "?"))
-                vert_lines.append(
-                    f"{tag} → {entry[0]}.{entry[1]}: delta range [{lo:+d} … {hi:+d}]"
-                )
-            if vert_lines:
-                ind.add_item(
-                    "[bold]Vertical / line-box tags (non-zero range over axis poles):[/bold]",
-                    indent_level=1,
-                )
-                for line in vert_lines[:20]:
-                    ind.add_item(line, indent_level=2)
-                if len(vert_lines) > 20:
-                    ind.add_item(f"… and {len(vert_lines) - 20} more", indent_level=2)
-            else:
-                ind.add_item(
-                    "MVAR vertical/typo tags all zero across pole samples — "
-                    "authored metrics likely stable vs axes (for these tags).",
-                    indent_level=1,
-                )
-
-            if unknown:
-                ind.add_item(
-                    f"[warning]{len(unknown)} unknown ValueTag(s) (not in FontTools "
-                    "MVAR_ENTRIES registry)[/warning]",
-                    indent_level=1,
-                )
-                if verbose:
-                    for ut in sorted(unknown.keys())[:12]:
-                        ind.add_item(f"tag {ut!r}", indent_level=2)
-
-            all_zero = all(lo == 0 and hi == 0 for lo, hi in ranges.values())
-            if verbose or not all_zero:
-                other = sorted(
-                    t
-                    for t, (lo, hi) in ranges.items()
-                    if t not in MVAR_VERTICAL_LINE_TAGS and (lo != 0 or hi != 0)
-                )
-                if other and verbose:
-                    ind.add_item("Other tags with variation:", indent_level=1)
-                    for t in other[:25]:
-                        lo, hi = ranges[t]
-                        ind.add_item(f"{t}: [{lo:+d} … {hi:+d}]", indent_level=2)
-
-            if verbose:
-                ind.add_item("[dim]Per-pole deltas (non-zero only):[/dim]", indent_level=1)
-                for label, uloc in samples:
-                    ln = normalized_variation_location(font, uloc)
-                    zm = mvar_delta_map(font, ln)
-                    nz = [f"{k}={v:+d}" for k, v in sorted(zm.items()) if v != 0]
-                    if nz:
-                        ind.add_item(f"{label}: {', '.join(nz)}", indent_level=2)
-        else:
-            ind.add_item("MVAR: absent", indent_level=1)
-
-        if "HVAR" in font:
-            st_def = hvar_advance_delta_stats(font, default_norm)
-            # Worst-case among poles for max-abs advance delta
-            worst_max = 0
-            worst_label = ""
-            for label, uloc in samples:
-                ln = normalized_variation_location(font, uloc)
-                st = hvar_advance_delta_stats(font, ln)
-                if st and isinstance(st["max_abs_delta"], int):
-                    if st["max_abs_delta"] > worst_max:
-                        worst_max = int(st["max_abs_delta"])
-                        worst_label = label
-            sample_n = len(_sample_glyph_names(font))
-            line = (
-                f"HVAR: sampled up to {sample_n} glyph(s) — "
-                f"default max |Δadvance|={st_def['max_abs_delta'] if st_def else 0}"
+    overflows: List[PoleOverflow] = []
+    for label, user_loc in samples[1:]:
+        bounds = instance_y_bounds(font, user_loc)
+        if bounds is None:
+            continue
+        above, below = _past_default(bounds, default_bounds, win_asc, win_desc)
+        if above > 0 or below > 0:
+            overflows.append(
+                PoleOverflow(label, above, below, bounds[0], bounds[1])
             )
-            if worst_max > (st_def["max_abs_delta"] if st_def else 0):
-                # Avoid literal [...] here — Rich markup eats bracket groups and can blank the label.
-                pole = worst_label or "?"
-                line += f"; worst sample: {pole} → max |Δadvance|={worst_max}"
-            ind.add_item(line, indent_level=1)
-            if verbose and st_def:
-                ind.add_item(
-                    f"defaults: glyphs checked={st_def['glyphs_checked']}, "
-                    f"non-zero advances={st_def['nonzero_advances']}",
-                    indent_level=2,
-                )
-        else:
-            ind.add_item("HVAR: absent", indent_level=1)
 
-        ind.emit(console)
+    dmin, dmax = default_bounds
+    default_above = dmax - win_asc
+    default_below = (-dmin) - win_desc
+
+    if clip_moving:
+        clipping = "already-varies"
+        clipping_text = f"already varies — {_span_text(clip_moving)}; leave it"
+    elif overflows:
+        clipping = "variable-overflow"
+        clipping_text = f"variable overflow at {len(overflows)} pole(s)"
+    else:
+        clipping = "no-variable-overflow"
+        if default_above > 0 or default_below > 0:
+            clipping_text = (
+                "no variable overflow — default ink exceeds Win by "
+                f"{_units_phrase(max(default_above, 0), max(default_below, 0))}; "
+                "poles do not go further"
+            )
+        else:
+            clipping_text = "no variable overflow"
+
+    kept_overflows = [] if clip_moving else list(overflows)
+    overflow_lines = [
+        _pole_sentence(
+            item,
+            upm=upm,
+            win_above=win_asc,
+            win_below=win_desc,
+            default_top=dmax,
+            default_bottom=dmin,
+        )
+        for item in kept_overflows
+    ]
+    if clip_moving and overflows:
+        verbose_lines.append(
+            "Some slider ends stick out, and the clipping box is already set to change with them."
+        )
+    for label, user_loc in samples:
+        if "MVAR" not in font:
+            break
+        snap = mvar_delta_map(font, normalized_variation_location(font, user_loc))
+        nonzero = [f"{tag}={value:+d}" for tag, value in sorted(snap.items()) if value != 0]
+        if nonzero:
+            verbose_lines.append(f"{label}: {', '.join(nonzero)}")
+
+    return Survey(
+        clipping=clipping,
+        line_box=line_box,
+        axes_line=axes_line,
+        line_box_text=line_box_text,
+        clipping_text=clipping_text,
+        upm=upm,
+        overflows=kept_overflows if clipping == "variable-overflow" else [],
+        overflow_lines=overflow_lines,
+        verbose_lines=verbose_lines,
+        axes=axes,
+        default_top=dmax,
+        default_bottom=dmin,
+        win_above=win_asc,
+        win_below=win_desc,
+        mvar_records=mvar_records,
+    )
+
+
+_POLE_NAMES = {
+    ("wght", "max"): "heaviest weight",
+    ("wght", "min"): "lightest weight",
+    ("wdth", "max"): "widest",
+    ("wdth", "min"): "narrowest",
+    ("opsz", "max"): "largest optical size",
+    ("opsz", "min"): "smallest optical size",
+    ("slnt", "max"): "most slant",
+    ("slnt", "min"): "least slant",
+    ("ital", "max"): "italic end",
+    ("ital", "min"): "roman end",
+}
+
+
+def _pole_sentence(
+    item: PoleOverflow,
+    *,
+    upm: int,
+    win_above: int,
+    win_below: int,
+    default_top: int,
+    default_bottom: int,
+) -> str:
+    """What one slider end does to the outlines, in designer terms."""
+    where = _pole_name(item.label)
+    parts = [
+        f"At the {where}, the outlines reach {item.y_max} above the baseline "
+        f"and {abs(item.y_min)} below it."
+    ]
+    if item.above > 0:
+        parts.append(
+            f"{item.above} units stick out above the clipping box, "
+            f"which stops at {win_above}."
+        )
+    if item.below > 0:
+        parts.append(
+            f"{item.below} units stick out below the clipping box, "
+            f"which stops at {win_below}."
+        )
+    parts.append(
+        f"The default style, before any slider is moved, reaches {default_top} above "
+        f"and {abs(default_bottom)} below, so this only shows up at that end of the slider."
+    )
+    pct = _hang_percent(item, upm)
+    parts.append(f"The em is {upm} units, so the hang is {_percent_text(pct)} of the em.")
+    return " ".join(parts)
+
+
+def _axis_sentence(tag: str, lo: float, default: float, hi: float) -> str:
+    titles = {
+        "wght": "Weight",
+        "wdth": "Width",
+        "opsz": "Optical size",
+        "slnt": "Slant",
+        "ital": "Italic",
+    }
+    title = titles.get(tag, tag)
+    if lo == default == hi:
+        return f"{title} is fixed at {lo:g}."
+    if lo == default:
+        return f"{title} runs from {lo:g}, which is the default, to {hi:g}."
+    if hi == default:
+        return f"{title} runs from {lo:g} to {hi:g}, which is the default."
+    return f"{title} runs from {lo:g} to {hi:g}. The default style sits at {default:g}."
+
+
+def explain_survey(survey: Survey) -> List[str]:
+    """Sentences for -vv. Each number says what it measures."""
+    lines: List[str] = []
+    if survey.clipping == "static":
+        lines.append("This file has no sliders. There is nothing variable to check.")
+        return lines
+    if survey.axes:
+        lines.append("Sliders: " + " ".join(_axis_sentence(*axis) for axis in survey.axes))
+    if survey.line_box == "moves":
+        lines.append(
+            "Line spacing already changes as the sliders move, so that change was left as designed."
+        )
+    elif survey.line_box == "flat":
+        lines.append("Line spacing stays the same wherever the sliders sit.")
+    if survey.mvar_records is None:
+        lines.append(
+            "The font does not store a separate clipping box or line spacing for other slider positions. "
+            "Every position uses the default style's boxes."
+        )
+    elif survey.clipping == "already-varies":
+        lines.append(
+            "The clipping box is already set to grow or shrink as the sliders move, so it was left alone."
+        )
+    else:
+        lines.append(
+            "The font stores other metric adjustments, and none of them move the clipping box."
+        )
+    if survey.default_top is not None and survey.win_above is not None:
+        lines.append(
+            f"At the default style, the outlines reach {survey.default_top} above the baseline "
+            f"and {abs(survey.default_bottom or 0)} below it. "
+            f"The clipping box, which is what keeps letters from being chopped, stops at "
+            f"{survey.win_above} above and {survey.win_below} below."
+        )
+    if survey.overflow_lines:
+        lines.extend(survey.overflow_lines)
+    elif survey.clipping == "no-variable-overflow":
+        lines.append("The ends of the sliders still fit inside that clipping box.")
+    lines.extend(survey.verbose_lines)
+    return lines
+
+
+def _pole_name(label: str) -> str:
+    head = label.split("·")[0].strip()
+    tag, _, end = head.partition("=")
+    end = end.strip()
+    return _POLE_NAMES.get((tag, end), f"{tag} {end}".strip())
+
+
+def _hang_percent(item: PoleOverflow, upm: int) -> float:
+    if upm <= 0:
+        return 0.0
+    return max(item.above, item.below) / upm * 100.0
+
+
+def _percent_text(pct: float) -> str:
+    if pct >= 10:
+        return f"{pct:.0f}%"
+    return f"{pct:.1f}%"
+
+
+def _of_em(units: int, upm: int) -> str:
+    if upm <= 0:
+        return f"{units} units"
+    return _percent_text(abs(units) / upm * 100.0)
+
+
+def metrics_brief(survey: Survey) -> str:
+    """One line of the measurements a type designer can use. No call to action."""
+    if survey.clipping == "static":
+        return "Not a variable font."
+    if survey.clipping == "error":
+        return survey.clipping_text or "Could not read the font."
+    if survey.clipping == "unmeasured" or survey.default_top is None or survey.win_above is None:
+        return survey.clipping_text or "Could not measure the font."
+    if survey.line_box == "moves":
+        spacing = "Line spacing already changes across the sliders."
+    else:
+        spacing = "Line spacing stays the same across the sliders."
+    outlines = (
+        f"Outlines at the default style reach {_of_em(survey.default_top, survey.upm)} of the em "
+        f"above the baseline and {_of_em(survey.default_bottom or 0, survey.upm)} below."
+    )
+    box = (
+        f"Clipping box stops at {_of_em(survey.win_above, survey.upm)} above "
+        f"and {_of_em(survey.win_below or 0, survey.upm)} below."
+    )
+    if survey.overflows:
+        worst = max(survey.overflows, key=lambda item: max(item.above, item.below))
+        ends = (
+            f"At the {_pole_name(worst.label)}, outlines pass that box by "
+            f"{_percent_text(_hang_percent(worst, survey.upm))} of the em."
+        )
+    else:
+        ends = "Slider ends stay inside the clipping box."
+    return f"Em {survey.upm}. {spacing} {outlines} {box} {ends}"
+
+
+def _status_for(survey: Survey) -> str:
+    if survey.clipping in ("error", "unmeasured"):
+        return "error" if survey.clipping == "error" else "info"
+    return "unchanged"
+
+
+REPORT_COLUMNS = (
+    "path",
+    "em",
+    "sliders",
+    "line_spacing",
+    "outlines",
+    "clipping_box",
+    "slider_ends",
+)
+
+
+def load_survey(path: str) -> Survey:
+    """Open one font and classify it. Does not print."""
+    try:
+        font = TTFont(str(path))
+    except Exception as e:
+        return Survey(clipping="error", line_box="n/a", clipping_text=str(e))
+    try:
+        return survey_font(font)
+    except Exception as e:
+        return Survey(clipping="error", line_box="n/a", clipping_text=str(e))
     finally:
         font.close()
 
 
-def run_probe(paths: Iterable[str], verbose: bool = False) -> None:
-    """Probe every path in the iterable."""
+def report_row(path: str, survey: Survey) -> List[str]:
+    sliders = " ".join(_axis_sentence(*axis) for axis in survey.axes)
+    if survey.line_box == "moves":
+        spacing = "changes with the sliders"
+    elif survey.line_box == "flat":
+        spacing = "stays the same"
+    else:
+        spacing = ""
+    if survey.default_top is None or survey.win_above is None:
+        outlines = ""
+        box = ""
+        ends = survey.clipping_text
+    else:
+        outlines = (
+            f"{_of_em(survey.default_top, survey.upm)} above, "
+            f"{_of_em(survey.default_bottom or 0, survey.upm)} below"
+        )
+        box = (
+            f"{_of_em(survey.win_above, survey.upm)} above, "
+            f"{_of_em(survey.win_below or 0, survey.upm)} below"
+        )
+        if survey.overflows:
+            worst = max(survey.overflows, key=lambda item: max(item.above, item.below))
+            ends = (
+                f"{_pole_name(worst.label)} passes the box by "
+                f"{_percent_text(_hang_percent(worst, survey.upm))} of the em"
+            )
+        else:
+            ends = "stay inside the box"
+    return [path, str(survey.upm or ""), sliders, spacing, outlines, box, ends]
+
+
+def probe_root(source_paths: Sequence[str]) -> Path:
+    """Directory a relative report belongs in: the folder that was probed."""
+    if not source_paths:
+        return Path.cwd()
+    roots: List[Path] = []
+    for raw in source_paths:
+        path = Path(raw).expanduser().resolve()
+        roots.append(path if path.is_dir() else path.parent)
+    if len(roots) == 1:
+        return roots[0]
+    try:
+        return Path(os.path.commonpath([str(root) for root in roots]))
+    except ValueError:
+        return roots[0]
+
+
+def report_destination(output: str, source_paths: Sequence[str]) -> str:
+    """Absolute report path. Relative names sit at the top of the probed directory."""
+    path = Path(output).expanduser()
+    if path.is_absolute():
+        return str(path)
+    return str(probe_root(source_paths) / path)
+
+
+def open_report(path: str) -> Tuple[TextIO, csv.writer]:
+    """Create a tab-separated report and write the header. Caller closes the file."""
+    handle = open(path, "w", newline="", encoding="utf-8")
+    writer = csv.writer(handle, delimiter="\t", lineterminator="\n")
+    writer.writerow(REPORT_COLUMNS)
+    handle.flush()
+    return handle, writer
+
+
+def _emit_survey(path: str, survey: Survey, verbose: int) -> None:
+    """Print the metrics. -vv adds the longer description of the same numbers."""
+    console = get_console()
+    fp = Path(path)
+    if survey.clipping == "error" and not survey.axes_line:
+        cs.StatusIndicator("error").add_file(str(fp), filename_only=False).with_explanation(
+            survey.clipping_text
+        ).emit(console)
+        return
+    ind = (
+        cs.StatusIndicator(_status_for(survey))
+        .add_file(str(fp), filename_only=False)
+        .add_message(metrics_brief(survey))
+    )
+    if verbose >= 1:
+        for line in survey.overflow_lines:
+            ind.add_item(line, indent_level=1)
+    if verbose >= 2:
+        for line in explain_survey(survey):
+            ind.add_item(line, indent_level=1)
+    ind.emit(console)
+
+
+def probe_font_file(path: str, verbose: int = 0) -> Survey:
+    """Print one font. ``verbose`` is 0, 1 (-v), or 2+ (-vv)."""
+    survey = load_survey(path)
+    _emit_survey(path, survey, verbose)
+    return survey
+
+
+def _progress_label(path: str) -> str:
+    name = Path(path).name.replace("[", "(").replace("]", ")")
+    return f"Probing {name}"
+
+
+def run_probe(
+    paths: Iterable[str],
+    verbose: int = 0,
+    quiet: bool = False,
+    output: Optional[str] = None,
+    source_paths: Optional[Sequence[str]] = None,
+) -> None:
+    """Probe every path, then print a tally. ``output`` is a TSV written as we go."""
     console = get_console()
     lst = list(paths)
     if not lst:
         cs.StatusIndicator("error").add_message("No font files to probe").emit(console)
         return
-    for p in lst:
-        probe_font_file(p, verbose=verbose)
+    if quiet and verbose:
+        cs.StatusIndicator("error").add_message(
+            "--quiet and --verbose cannot be combined"
+        ).emit(console)
+        raise SystemExit(2)
+
+    report_handle: Optional[TextIO] = None
+    report_writer: Optional[csv.writer] = None
+    if output:
+        output = report_destination(output, list(source_paths or []))
+        try:
+            report_handle, report_writer = open_report(output)
+        except OSError as e:
+            cs.StatusIndicator("error").add_message(
+                f"Could not write {output}: {e}"
+            ).emit(console)
+            raise SystemExit(2)
+    elif quiet:
+        cs.StatusIndicator("warning").add_message(
+            "Quiet mode omits per-font lines. Pass -o FILE to keep them."
+        ).emit(console)
+
+    def _record(path: str, survey: Survey) -> None:
+        if report_writer is not None and report_handle is not None:
+            report_writer.writerow(report_row(path, survey))
+            report_handle.flush()
+
+    try:
+        if quiet:
+            with cs.create_progress_bar(console) as progress:
+                task = progress.add_task("Probing", total=len(lst))
+                for path in lst:
+                    progress.update(task, description=_progress_label(path))
+                    _record(path, load_survey(path))
+                    progress.advance(task)
+        else:
+            for path in lst:
+                _record(path, probe_font_file(path, verbose=verbose))
+    finally:
+        if report_handle is not None:
+            report_handle.close()
+
     cs.emit("", console=console)
+    summary = f"Probe: {len(lst)} font(s)."
+    if output:
+        summary += f" Report: {output}."
+    cs.StatusIndicator("info").add_message(summary).emit(console)

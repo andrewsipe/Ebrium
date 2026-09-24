@@ -45,8 +45,9 @@ ebrium family /path/to/fonts -r -n</code></pre>
       <li><code>family</code> — group by family name; cluster within each family (usual case)</li>
       <li><code>individual</code> — each font alone; no family pull</li>
       <li><code>superfamily</code> — merge families that share a name prefix</li>
-      <li><code>probe</code> — read-only MVAR/HVAR coverage (variable fonts)</li>
+      <li><code>probe</code> — read-only: does the line box already move, and do axis poles overflow a flat Win box?</li>
     </ul>
+    <p>Variable fonts: <code>family</code>, <code>individual</code>, and <code>superfamily</code> rewrite the default instance only. They leave MVAR and HVAR alone. <code>probe</code> reports two facts and does not write: a typo line box that already moves should be left, and a flat Win box is worth a later look only when some axis pole sticks out past the default ink.</p>
 
     <div class="card-grid">
       <a class="card" href="concepts.html">

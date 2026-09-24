@@ -53,10 +53,13 @@
         </tr>
         <tr>
           <td><code>probe</code></td>
-          <td>Input + <code>-v</code> only (per-pole deltas)</td>
+          <td>Input, <code>-q</code>, <code>-o</code>, <code>-v</code>. Line box and Win clipping report, then a tally.</td>
         </tr>
       </tbody>
     </table>
+    <div class="callout warn">
+      <strong>Variable fonts.</strong> <code>family</code>, <code>individual</code>, and <code>superfamily</code> rewrite the default instance only and leave MVAR and HVAR alone. <code>probe</code> is the read-only check: a line box that already moves is left, and a flat Win box is reported when an axis pole sticks out past the default ink.
+    </div>
 
     <h2>Shared (individual / family / superfamily)</h2>
     <table>
@@ -74,7 +77,28 @@
         <tr><td><code>--no-auto-adjust</code></td><td>Use exact <code>--letter-height</code></td></tr>
         <tr><td><code>-a, --assume TYPE:PATTERN</code></td><td>Force classify: <code>script</code>, <code>decorative</code>, <code>unicase</code>, <code>uniwidth</code> (repeatable)</td></tr>
         <tr><td><code>--exclude-measuring PATTERN</code></td><td>Exclude from family calculations (not a classify flag)</td></tr>
-        <tr><td><code>-v / -vv</code></td><td>Verbosity (<code>probe</code>: <code>-v</code> only; repeating does nothing extra)</td></tr>
+        <tr><td><code>-v / -vv</code></td><td>Verbosity. On <code>probe</code>, <code>-vv</code> spells the metrics out in full sentences.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>probe only</h2>
+    <table>
+      <thead>
+        <tr><th>Flag</th><th>Meaning</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>-q, --quiet</code></td>
+          <td>Current filename and a progress bar, then a count. The metrics go to <code>-o</code>. Cannot be combined with <code>-v</code>.</td>
+        </tr>
+        <tr>
+          <td><code>-o, --output FILE</code></td>
+          <td>Tab-separated metrics sheet, one row per font, written as the run goes. Columns are em, sliders, line spacing, default outlines, clipping box, and whether a slider end passes that box. A relative file is saved at the top of the directory you probed.</td>
+        </tr>
+        <tr>
+          <td><code>-v</code></td>
+          <td><code>-vv</code> spells the metrics out in full sentences.</td>
+        </tr>
       </tbody>
     </table>
 
@@ -149,7 +173,7 @@ ebrium superfamily fonts/ -r -e "SpecialSans"</code></pre>
 
   <footer class="site-footer">
     <a href="logic.html">← How it thinks</a>
-    · <a href="terminal.html">Terminal →</a>
+    · <a href="terminal.html">Reading a run →</a>
   </footer>
 </body>
 </html>

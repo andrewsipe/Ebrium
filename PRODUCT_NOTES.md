@@ -101,7 +101,7 @@ FontCore is vendored (console + collector + sorter + CLI help); no submodule.
 ## Known behavior (documented in `--help` notes)
 
 - Even `-n` / `--report` write `.metrics_checkpoint.json` in the **current** directory
-  (`probe` doesn't measure at all, so it never writes one)
+  (`probe` reads instances for its report and never writes one)
 - Exit code `2` is used both for “no measurable fonts” and by argparse for bad args
 
 ## Docs site
@@ -109,10 +109,12 @@ FontCore is vendored (console + collector + sorter + CLI help); no submodule.
 Static Pages site in `docs/` (concepts, logic, flags, report lookup). README is the
 product front door; advanced detail lives on the site.
 
-Enable once on GitHub: **Settings → Pages → Deploy from a branch → `main` / `/docs`**.
-URL: https://andrewsipe.github.io/ebrium/
+Pages is on: **Settings → Pages → Deploy from a branch → `main` / `/docs`**.
+The user site’s custom domain covers project sites, so the public URL is
+https://www.andrewsipe.com/Ebrium/ (repo-name case). `andrewsipe.github.io/ebrium/`
+redirects to the lowercase path and 404s.
 
-Optional: set the repo About “Website” field to that URL.
+Optional: set the repo About “Website” field to the www URL.
 
 ## Deferred
 

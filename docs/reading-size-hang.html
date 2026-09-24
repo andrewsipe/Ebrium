@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>A 1.7% hang at reading size</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --ink: #1c1915;
+      --muted: #5c564c;
+      --paper: #f4f0e8;
+      --clip: #1f6f68;
+      --hang: #9a3412;
+      --default: #8a8175;
+      --rule: #d9d2c5;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: "Source Serif 4", Georgia, serif;
+      font-size: 1.05rem;
+      line-height: 1.45;
+    }
+    main { max-width: 52rem; margin: 0 auto; padding: 2.5rem 1.5rem 4rem; }
+    h1 { font-size: 2rem; font-weight: 600; letter-spacing: -0.03em; margin: 0 0 0.4rem; }
+    .lede { color: var(--muted); margin: 0 0 2rem; max-width: 38rem; }
+    .compare { display: grid; grid-template-columns: 8.5rem 1fr; gap: 1.5rem 2rem; align-items: start; }
+    h2 { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 0.72rem; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; margin: 0 0 0.8rem; color: var(--muted); }
+    .figure { margin: 0; }
+    figcaption { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 0.72rem; color: var(--muted); margin-top: 0.7rem; }
+
+    /* Shared drawing. --fs is one em. Numbers are Arsenica Variable Italic, UPM 2048. */
+    .stack {
+      --fs: 16px;
+      --upm: 2048;
+      position: relative;
+      height: calc(2400 / var(--upm) * var(--fs) + 650 / var(--upm) * var(--fs));
+      margin-left: 2.2rem;
+    }
+    .baseline, .clip, .ink, .heavy {
+      position: absolute;
+      left: 0;
+      right: 0;
+    }
+    .baseline {
+      top: calc(2400 / var(--upm) * var(--fs));
+      height: 0;
+      border-top: 1px solid var(--ink);
+    }
+    .baseline span, .edge span {
+      position: absolute;
+      left: -2.2rem;
+      top: -0.45rem;
+      font-family: "IBM Plex Mono", ui-monospace, monospace;
+      font-size: 0.65rem;
+      color: var(--muted);
+    }
+    .clip {
+      top: calc((2400 - 2248) / var(--upm) * var(--fs));
+      height: calc((2248 + 591) / var(--upm) * var(--fs));
+      border: 1.5px solid var(--clip);
+      background: rgba(31, 111, 104, 0.06);
+    }
+    .ink {
+      top: calc((2400 - 2173) / var(--upm) * var(--fs));
+      height: calc((2173 + 458) / var(--upm) * var(--fs));
+      left: 18%;
+      right: 18%;
+      background: var(--default);
+    }
+    .heavy {
+      top: calc((2400 - 2282) / var(--upm) * var(--fs));
+      height: calc((2282 + 498) / var(--upm) * var(--fs));
+      left: 42%;
+      right: 18%;
+      background: var(--ink);
+    }
+    .reading { --fs: 16px; }
+    .enlarged { --fs: 200px; }
+
+    .zoom {
+      margin-top: 2.5rem;
+      display: grid;
+      grid-template-columns: 10rem 1fr;
+      gap: 1.5rem;
+      align-items: center;
+    }
+    .crop {
+      --unit: 1.5px;
+      --origin: 2340;
+      position: relative;
+      height: calc((var(--origin) - 2120) * var(--unit));
+      margin-left: 0.5rem;
+      background: rgba(255, 255, 255, 0.35);
+    }
+    .crop .clip-line, .crop .heavy-line, .crop .default-line {
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 0;
+    }
+    .crop .clip-line {
+      top: calc((var(--origin) - 2248) * var(--unit));
+      border-top: 2px solid var(--clip);
+    }
+    .crop .heavy-line {
+      top: calc((var(--origin) - 2282) * var(--unit));
+      border-top: 2px solid var(--hang);
+    }
+    .crop .default-line {
+      top: calc((var(--origin) - 2173) * var(--unit));
+      border-top: 2px solid var(--default);
+    }
+    .crop .hang {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: calc((var(--origin) - 2282) * var(--unit));
+      height: calc(34 * var(--unit));
+      background: rgba(154, 52, 18, 0.2);
+    }
+    .key { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 0.75rem; line-height: 1.6; }
+    .key i { display: inline-block; width: 0.8rem; height: 0.45rem; margin-right: 0.4rem; vertical-align: 0; }
+    .swatch-clip { background: var(--clip); }
+    .swatch-heavy { background: var(--hang); }
+    .swatch-ink { background: var(--default); }
+    .note { margin-top: 1.5rem; max-width: 38rem; color: var(--muted); }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>1.7% of the em, at reading size</h1>
+    <p class="lede">Arsenica Variable Italic, heaviest weight. The outlines pass the clipping box by 34 units on a 2048-unit em. At 16px that is a quarter of a pixel.</p>
+
+    <div class="compare">
+      <figure class="figure">
+        <h2>16px em</h2>
+        <div class="stack reading" aria-hidden="true">
+          <div class="clip"></div>
+          <div class="ink"></div>
+          <div class="heavy"></div>
+          <div class="baseline"><span>baseline</span></div>
+        </div>
+        <figcaption>The hang is inside the stroke of the box.</figcaption>
+      </figure>
+      <figure class="figure">
+        <h2>Same drawing, em = 200px</h2>
+        <div class="stack enlarged" aria-hidden="true">
+          <div class="clip"></div>
+          <div class="ink"></div>
+          <div class="heavy"></div>
+          <div class="baseline"><span>baseline</span></div>
+        </div>
+        <figcaption>Gray is the default style. Black is the heavy weight. Teal is the clipping box.</figcaption>
+      </figure>
+    </div>
+
+    <div class="zoom">
+      <div class="crop" aria-hidden="true">
+        <div class="hang"></div>
+        <div class="heavy-line"></div>
+        <div class="clip-line"></div>
+        <div class="default-line"></div>
+      </div>
+      <div>
+        <h2>Top edge, magnified</h2>
+        <p class="key">
+          <i class="swatch-heavy"></i>Heavy outlines, 2282<br />
+          <i class="swatch-clip"></i>Clipping box, 2248<br />
+          <i class="swatch-ink"></i>Default outlines, 2173
+        </p>
+        <p class="note">The tinted band is the 34 units that stick out. At 12pt that band is 0.2pt. It cannot change the line spacing you read.</p>
+      </div>
+    </div>
+  </main>
+</body>
+</html>

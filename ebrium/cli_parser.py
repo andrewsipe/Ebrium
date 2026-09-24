@@ -12,7 +12,7 @@ This version has one subcommand per branch:
   ebrium individual  [options] PATH...   -- each font normalized alone
   ebrium family      [options] PATH...   -- group by family, optional --no-cluster
   ebrium superfamily [options] PATH...   -- merge shared-prefix families
-  ebrium probe       [options] PATH...   -- read-only MVAR/HVAR report
+  ebrium probe       [options] PATH...   -- read-only line-box and clipping report
                                              (was --probe-variation-metrics;
                                              it never touched grouping,
                                              measurement, or config at all --
@@ -46,6 +46,7 @@ In cli.py:
 from __future__ import annotations
 
 import argparse
+from typing import Any
 
 from FontCore.core_cli_help import (
     RichHelp,
@@ -62,7 +63,7 @@ from FontCore.core_console_styles import get_console
 from . import __version__
 
 PROG = "ebrium"
-DOCS_URL = "https://andrewsipe.github.io/ebrium/"
+DOCS_URL = "https://www.andrewsipe.com/Ebrium/"
 FORMATS_LINE = "TTF, OTF, WOFF, WOFF2 (.ttx with --use-ttx)"
 
 ASSUME_TYPES = {
@@ -92,7 +93,7 @@ MODE_SUMMARY = {
     "individual": "normalize each font on its own; no grouping or clustering",
     "family": "group by family name; cluster within each family (add --no-cluster to skip clustering)",
     "superfamily": "merge families sharing a name prefix; cluster across the superfamily",
-    "probe": "read-only MVAR/HVAR coverage report; no grouping, measuring, or writing",
+    "probe": "read-only report: does the line box already move, and do axis poles overflow a flat Win box?",
 }
 
 # Coupled to inline tables under "line box (typo / hhea)" and "detection
@@ -151,8 +152,10 @@ PANEL_MESSAGE = (
 # helpers add the same flag to whichever subcommands actually use it, instead of
 # every subcommand redefining it (and instead of one subcommand exposing a flag
 # that does nothing for it).
+# Group and subparser parameters are Any: argparse's group and subparser classes
+# are private (_ArgumentGroup, _SubParsersAction).
 
-def _add_input_args(g: argparse._ArgumentGroup) -> None:
+def _add_input_args(g: Any) -> None:
     g.add_argument(
         "paths", nargs="*", metavar="PATH",
         help="font files or directories (default: current directory)",
@@ -161,19 +164,19 @@ def _add_input_args(g: argparse._ArgumentGroup) -> None:
     g.add_argument("--use-ttx", action="store_true", help="also process .ttx files")
 
 
-def _add_preview_args(g: argparse._ArgumentGroup) -> None:
+def _add_preview_args(g: Any) -> None:
     g.add_argument("-n", "--dry-run", action="store_true", help="preview changes without writing")
     g.add_argument("-y", "--yes", action="store_true", help="skip the 'Proceed? [y/N]' prompt")
 
 
-def _add_report_arg(g: argparse._ArgumentGroup) -> None:
+def _add_report_arg(g: Any) -> None:
     g.add_argument(
         "--report", action="store_true",
         help="detailed family vs per-font analysis (implies --dry-run)",
     )
 
 
-def _add_spacing_args(g: argparse._ArgumentGroup, *, include_max_adjustment: bool = True) -> None:
+def _add_spacing_args(g: Any, *, include_max_adjustment: bool = True) -> None:
     g.add_argument(
         "-l", "--letter-height", type=float, default=130, metavar="PERCENT",
         help="target height of the letter span (default: 130); a floor, not a fixed "
@@ -200,7 +203,7 @@ def _add_spacing_args(g: argparse._ArgumentGroup, *, include_max_adjustment: boo
     )
 
 
-def _add_detection_args(p: argparse.ArgumentParser, g: argparse._ArgumentGroup) -> None:
+def _add_detection_args(p: argparse.ArgumentParser, g: Any) -> None:
     g.add_argument(
         "-a", "--assume", dest="assume", action="append", type=_assume_value,
         metavar="TYPE:PATTERN",
@@ -218,7 +221,7 @@ def _add_detection_args(p: argparse.ArgumentParser, g: argparse._ArgumentGroup) 
     p.add_argument("--max-span-ratio", type=float, default=1.5, help=argparse.SUPPRESS)
 
 
-def _add_grouping_mod_args(p: argparse.ArgumentParser, g: argparse._ArgumentGroup) -> None:
+def _add_grouping_mod_args(p: argparse.ArgumentParser, g: Any) -> None:
     g.add_argument(
         "-m", "--merge", action="append", dest="combine", metavar="GROUP",
         help='merge one group of families per flag, comma-separated inside the flag: '
@@ -236,7 +239,7 @@ def _add_grouping_mod_args(p: argparse.ArgumentParser, g: argparse._ArgumentGrou
     )
 
 
-def _add_line_box_args(g: argparse._ArgumentGroup) -> None:
+def _add_line_box_args(g: Any) -> None:
     g.add_argument(
         "-b", "--line-box", dest="line_box", default="auto",
         choices=["auto", "force-baseline", "force-baseline-main-cluster", "safe-hhea"],
@@ -250,13 +253,13 @@ def _add_line_box_args(g: argparse._ArgumentGroup) -> None:
     )
 
 
-def _add_general_args(g: argparse._ArgumentGroup, verbose_help: str) -> None:
+def _add_general_args(g: Any, verbose_help: str) -> None:
     g.add_argument("--version", action="version", version=f"{PROG} {__version__}")
     g.add_argument("-v", "--verbose", action="count", default=0, help=verbose_help)
 
 
 def _add_help(
-    g: argparse._ArgumentGroup,
+    g: Any,
     *,
     panel,
     footer,
@@ -270,7 +273,7 @@ def _add_help(
 
 # ---------------------------------------------------------------- subcommands
 
-def _build_individual(subparsers: argparse._SubParsersAction) -> None:
+def _build_individual(subparsers: Any) -> None:
     p = subparsers.add_parser(
         "individual",
         usage="%(prog)s [options] [PATH ...]",
@@ -315,7 +318,7 @@ def _build_individual(subparsers: argparse._SubParsersAction) -> None:
     _add_general_args(g_gen, "verbose output; -vv for debug output")
 
 
-def _build_family(subparsers: argparse._SubParsersAction) -> None:
+def _build_family(subparsers: Any) -> None:
     p = subparsers.add_parser(
         "family",
         usage="%(prog)s [options] [PATH ...]",
@@ -390,7 +393,7 @@ def _build_family(subparsers: argparse._SubParsersAction) -> None:
     _add_general_args(g_gen, "verbose output; -vv for debug output")
 
 
-def _build_superfamily(subparsers: argparse._SubParsersAction) -> None:
+def _build_superfamily(subparsers: Any) -> None:
     p = subparsers.add_parser(
         "superfamily",
         usage="%(prog)s [options] [PATH ...]",
@@ -458,26 +461,32 @@ def _build_superfamily(subparsers: argparse._SubParsersAction) -> None:
     _add_general_args(g_gen, "verbose output; -vv for debug output")
 
 
-def _build_probe(subparsers: argparse._SubParsersAction) -> None:
+def _build_probe(subparsers: Any) -> None:
     p = subparsers.add_parser(
         "probe",
         usage="%(prog)s [options] [PATH ...]",
         allow_abbrev=False,
-        description="Read-only MVAR/HVAR coverage report for variable fonts -- "
-        "no grouping, measuring, or writing.",
+        description="Read-only report for variable fonts: whether the typo line box "
+        "already moves, and whether axis poles overflow a flat Win clipping box. "
+        "Does not modify fonts.",
         add_help=False,
     )
     g_in = p.add_argument_group("input")
+    g_out = p.add_argument_group("report")
     g_gen = p.add_argument_group("general")
 
     examples = [
-        ("ebrium probe fonts/ -r", "read-only MVAR/HVAR coverage report"),
-        ("ebrium probe fonts/ -r -v", "same, with per-pole deltas"),
+        ("ebrium probe fonts/ -r", "metrics for each variable font"),
+        ("ebrium probe fonts/ -r -vv", "the same metrics, with the measurements spelled out"),
+        (
+            "ebrium probe fonts/ -r -q -o probe.tsv",
+            "corpus run: current filename, progress bar, tally, and a spreadsheet",
+        ),
     ]
 
     _add_help(
         g_gen,
-        panel=False,  # nothing is written; no safety wording needed
+        panel=False,  # fonts are not modified; no safety wording needed
         footer=[
             examples_section(examples),
             exit_status_section(PROBE_EXIT_CODES),
@@ -485,8 +494,19 @@ def _build_probe(subparsers: argparse._SubParsersAction) -> None:
             docs_section(DOCS_URL),
         ],
     )
+    g_out.add_argument(
+        "-o", "--output", metavar="FILE",
+        help="write a tab-separated metrics sheet as the run goes (kept if you stop early). "
+        "A relative FILE is saved at the top of the directory you probed, not the "
+        "shell's current directory",
+    )
+    g_out.add_argument(
+        "-q", "--quiet", action="store_true",
+        help="terminal shows the current filename and a progress bar, then the tally; "
+        "per-font lines go to --output only",
+    )
     _add_general_args(
-        g_gen, "verbose output (per-pole deltas); repeating has no extra effect"
+        g_gen, "-vv spells out the same metrics in full sentences"
     )
     _add_input_args(g_in)
 

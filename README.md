@@ -8,7 +8,7 @@ Formerly **FontMetricsNormalizer**. The public name and CLI are **ebrium**.
 
 Typical pipeline: naming cleanup ([FontNameID](https://github.com/andrewsipe/FontNameID)) → structural tidy ([FontFixer](https://github.com/andrewsipe/FontFixer)) → **ebrium**.
 
-**Docs:** [Line box, reading a run, flags, and report lookup](https://andrewsipe.github.io/ebrium/) · full flag detail also in `ebrium <subcommand> --help`
+**Docs:** [Line box, reading a run, flags, and report lookup](https://www.andrewsipe.com/Ebrium/) · full flag detail also in `ebrium <subcommand> --help`
 
 ## Install
 
@@ -22,6 +22,8 @@ pipx install "git+https://github.com/andrewsipe/ebrium.git"
 Or from a clone: `pipx install .` / `pip install -e .`
 
 Requires Python 3.9+. Formats: TTF, OTF, WOFF, WOFF2 (`.ttx` with `--use-ttx`).
+
+Tests: `python -m unittest discover -s tests`
 
 ## Quick start
 
@@ -46,8 +48,16 @@ ebrium individual /path/to/fonts -r
 # Merge families that share a name prefix
 ebrium superfamily /path/to/fonts -r
 
-# Variable fonts: MVAR/HVAR coverage only (no writes)
-ebrium probe /path/to/fonts -r
+# Variable fonts: these subcommands rewrite the default instance only.
+# probe reports whether the line box already moves, and whether a flat Win
+# box is overflowed at the axis poles. It does not write.
+ebrium probe /path/to/variable-fonts -r
+
+# A few files: em, line spacing, outlines, and the clipping box
+ebrium probe /path/to/fonts
+
+# The same facts, spelled out
+ebrium probe /path/to/fonts -vv
 ```
 
 By default, matching fonts are **modified in place** (no backup). Use `-n` or `--report` first.
@@ -61,7 +71,7 @@ By default, matching fonts are **modified in place** (no backup). Use `-n` or `-
 
 Decorative outliers can inherit typo metrics while expanding Win bounds. Line gaps go to zero; `USE_TYPO_METRICS` is set when OS/2 version ≥ 4.
 
-For the line-box picture, how to read a run, clustering logic, every flag, and `--report`, use the [doc site](https://andrewsipe.github.io/ebrium/).
+For the line-box picture, how to read a run, clustering logic, every flag, and `--report`, use the [doc site](https://www.andrewsipe.com/Ebrium/).
 
 ## Related
 

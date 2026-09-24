@@ -63,13 +63,20 @@ def main() -> None:
     args = parse_args()
 
     if args.mode == "probe":
-        files_probe = scan_fonts(args.paths or ["."], args.recursive, args.use_ttx)
+        source_paths = args.paths or ["."]
+        files_probe = scan_fonts(source_paths, args.recursive, args.use_ttx)
         if not files_probe:
             cs.StatusIndicator("error").add_message("No font files found").emit(console)
             sys.exit(1)
         from . import variation_probe
 
-        variation_probe.run_probe(files_probe, verbose=args.verbose >= 1)
+        variation_probe.run_probe(
+            files_probe,
+            verbose=int(args.verbose or 0),
+            quiet=bool(getattr(args, "quiet", False)),
+            output=getattr(args, "output", None),
+            source_paths=source_paths,
+        )
         elapsed = time.time() - start_time
         cs.emit(
             f"{cs.INDENT}[darktext.dim]Total time: [bold]{elapsed:.1f}[/bold]s[/darktext.dim]",
