@@ -30,7 +30,7 @@
     <p class="meta">Documentation · v3.2.2</p>
     <h1>Vertical metrics, family-wide</h1>
     <p class="lede">
-      ebrium normalizes typo, hhea, and Win metrics across a family so styles share a coherent line box and don’t clip — without touching <code>unitsPerEm</code> or outlines.
+      ebrium normalizes typo, <a href="https://learn.microsoft.com/en-us/typography/opentype/spec/hhea">hhea</a>, and Win metrics across a family so styles share a coherent line box and don’t clip — without touching <a href="https://learn.microsoft.com/en-us/typography/opentype/spec/head#unitsPerEm"><code>unitsPerEm</code></a> or outlines.
     </p>
 
     <div class="callout warn">
@@ -47,7 +47,7 @@ ebrium family /path/to/fonts -r -n</code></pre>
       <li><code>superfamily</code> — merge families that share a name prefix</li>
       <li><code>probe</code> — read-only metrics, grouped by family: cap, x-height, stored hhea / typo / Win, pull, and variable-font slider facts</li>
     </ul>
-    <p>Variable fonts: <code>family</code>, <code>individual</code>, and <code>superfamily</code> rewrite the default instance only and leave MVAR and HVAR alone. <code>probe</code> reads that default instance along with every static font and does not write.</p>
+    <p>Variable fonts: <code>family</code>, <code>individual</code>, and <code>superfamily</code> rewrite the default instance only and leave <a href="https://learn.microsoft.com/en-us/typography/opentype/spec/mvar">MVAR</a> and <a href="https://learn.microsoft.com/en-us/typography/opentype/spec/hvar">HVAR</a> alone. <code>probe</code> reads that default instance along with every static font and does not write.</p>
 
     <div class="card-grid">
       <a class="card" href="concepts.html">

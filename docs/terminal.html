@@ -174,23 +174,23 @@ hhea table:
       </thead>
       <tbody>
         <tr>
-          <td><code>sTypoAscender</code>, hhea <code>ascent</code></td>
+          <td><a href="https://learn.microsoft.com/en-us/typography/opentype/spec/os2#sTypoAscender"><code>sTypoAscender</code></a>, <a href="https://learn.microsoft.com/en-us/typography/opentype/spec/hhea#ascent">hhea ascent</a></td>
           <td>Top of the line box. 750 → 920. The 920 is the capital height plus the default 25% of headroom.</td>
         </tr>
         <tr>
-          <td><code>sTypoDescender</code>, hhea <code>descent</code></td>
+          <td><a href="https://learn.microsoft.com/en-us/typography/opentype/spec/os2#sTypoDescender"><code>sTypoDescender</code></a>, <a href="https://learn.microsoft.com/en-us/typography/opentype/spec/hhea#descent">hhea descent</a></td>
           <td>Bottom of the line box. −100 → −380. The old 100 is shorter than the descenders, so they hang out. Together with 920, the new box is the 1300-unit default.</td>
         </tr>
         <tr>
-          <td><code>sTypoLineGap</code>, hhea <code>lineGap</code></td>
+          <td><a href="https://learn.microsoft.com/en-us/typography/opentype/spec/os2#sTypoLineGap"><code>sTypoLineGap</code></a>, <a href="https://learn.microsoft.com/en-us/typography/opentype/spec/hhea#lineGap">hhea lineGap</a></td>
           <td>The gap between boxes. 600 → 0.</td>
         </tr>
         <tr>
-          <td><code>fsSelection (USE_TYPO_METRICS)</code></td>
+          <td><a href="https://learn.microsoft.com/en-us/typography/opentype/spec/os2#fsSelection"><code>fsSelection</code> (<code>USE_TYPO_METRICS</code>)</a></td>
           <td>Tells apps to use the typo line box for line spacing. On OS/2 version 4 or newer, ebrium turns that bit on. The line is absent when it was already set, and on older OS/2 tables.</td>
         </tr>
         <tr>
-          <td><code>usWinAscent</code>, <code>usWinDescent</code></td>
+          <td><a href="https://learn.microsoft.com/en-us/typography/opentype/spec/os2#usWinAscent"><code>usWinAscent</code></a>, <a href="https://learn.microsoft.com/en-us/typography/opentype/spec/os2#usWinDescent"><code>usWinDescent</code></a></td>
           <td>The clipping box: how far drawing may go before it is cut off. Ascent is above the baseline. Descent is below it and stored as a positive number (120 → 380). In this example they move out to the new box so the letters are not clipped.</td>
         </tr>
         <tr>

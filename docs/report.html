@@ -42,13 +42,62 @@ Sans-Bold.ttf      1000  705  490  +50u (+6.5%)
 Sans-Regular.ttf   1000  700  480  +70u (+8.5%)</div>
 
     <h2><code>-v</code></h2>
-    <p>Adds a second table. Each cell is ascent / descent / line gap, except Win, which is ascent / descent. These are the values stored in the font now.</p>
+    <p>Adds a second table. <code>A/D/L</code> is ascender, descender, and line gap, in that order. Win is ascent and descent only. These are the values stored in the font now.</p>
     <div class="report-sample" aria-label="Verbose probe table">File               hhea A/D/L    sTypo A/D/L   usWin A/D   UseTypo
 <span class="ok">Sans-Black.ttf     820/-205/0    820/-205/0    840/210     set</span>
 Sans-Bold.ttf      800/-200/0    800/-200/0    820/205     set</div>
 
     <h2><code>-vv</code></h2>
-    <p>One wide table. <code>hheaA</code>, <code>hheaD</code>, <code>hheaLG</code>, <code>sTypoA</code>, <code>sTypoD</code>, <code>sTypoLG</code>, <code>WinA</code>, and <code>WinD</code> are each their own column, along with UPM, cap, x-height, <code>UseTypo</code>, and pull.</p>
+    <p>One wide table. The same numbers as <code>-v</code>, each in its own column: <code>hheaA</code> <code>hheaD</code> <code>hheaLG</code>, <code>sTypoA</code> <code>sTypoD</code> <code>sTypoLG</code>, and <code>WinA</code> <code>WinD</code>, plus units per em, cap height, x-height, <code>UseTypo</code>, and pull.</p>
+
+    <h2>Column names</h2>
+    <table>
+      <thead>
+        <tr><th>In the terminal</th><th>Full name</th><th>What it is</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>UPM</code></td>
+          <td><a href="https://learn.microsoft.com/en-us/typography/opentype/spec/head#unitsPerEm">units per em</a></td>
+          <td>The em square, in font units, from the <code>head</code> table. The other numbers on the row are in these units. ebrium does not change it.</td>
+        </tr>
+        <tr>
+          <td><code>Cap</code></td>
+          <td>cap height</td>
+          <td>Measured height of the capitals, from the baseline, in font units. The stored OS/2 field for this is <a href="https://learn.microsoft.com/en-us/typography/opentype/spec/os2#sCapHeight"><code>sCapHeight</code></a>. This column is the measurement, not that field.</td>
+        </tr>
+        <tr>
+          <td><code>xHt</code></td>
+          <td>x-height</td>
+          <td>Measured height of the lowercase, from the baseline, in font units. The stored OS/2 field for this is <a href="https://learn.microsoft.com/en-us/typography/opentype/spec/os2#sxHeight"><code>sxHeight</code></a>. This column is the measurement, not that field.</td>
+        </tr>
+        <tr>
+          <td><code>Pull</code></td>
+          <td>family pull</td>
+          <td>How far sharing the family plan would move this font’s ascender, in units and as a percent, compared with measuring the font alone. The driver is <code>0u (+0.0%)</code>.</td>
+        </tr>
+        <tr>
+          <td><code>hhea A/D/L</code><br /><code>hheaA</code> <code>hheaD</code> <code>hheaLG</code></td>
+          <td><a href="https://learn.microsoft.com/en-us/typography/opentype/spec/hhea#ascent"><code>hhea</code> ascent</a>, <a href="https://learn.microsoft.com/en-us/typography/opentype/spec/hhea#descent">descent</a>, <a href="https://learn.microsoft.com/en-us/typography/opentype/spec/hhea#lineGap">line gap</a></td>
+          <td>The line box stored in the <a href="https://learn.microsoft.com/en-us/typography/opentype/spec/hhea"><code>hhea</code></a> table. <code>A</code> is ascent (above the baseline). <code>D</code> is descent (below the baseline, stored as a negative number). <code>L</code> and <code>LG</code> are the line gap, extra space between lines. In the compact table the three numbers share one cell, in that order.</td>
+        </tr>
+        <tr>
+          <td><code>sTypo A/D/L</code><br /><code>sTypoA</code> <code>sTypoD</code> <code>sTypoLG</code></td>
+          <td><a href="https://learn.microsoft.com/en-us/typography/opentype/spec/os2#sTypoAscender"><code>sTypoAscender</code></a>, <a href="https://learn.microsoft.com/en-us/typography/opentype/spec/os2#sTypoDescender"><code>sTypoDescender</code></a>, <a href="https://learn.microsoft.com/en-us/typography/opentype/spec/os2#sTypoLineGap"><code>sTypoLineGap</code></a></td>
+          <td>The typographic line box stored in the <a href="https://learn.microsoft.com/en-us/typography/opentype/spec/os2">OS/2</a> table. Same three roles as hhea: above the baseline, below the baseline, and the gap between lines. Apps that honor <code>USE_TYPO_METRICS</code> use this box for line spacing.</td>
+        </tr>
+        <tr>
+          <td><code>usWin A/D</code><br /><code>WinA</code> <code>WinD</code></td>
+          <td><a href="https://learn.microsoft.com/en-us/typography/opentype/spec/os2#usWinAscent"><code>usWinAscent</code></a>, <a href="https://learn.microsoft.com/en-us/typography/opentype/spec/os2#usWinDescent"><code>usWinDescent</code></a></td>
+          <td>The clipping box stored in the OS/2 table. Ascent is how far above the baseline letters may draw before an app may chop them. Descent is how far below. There is no Win line gap.</td>
+        </tr>
+        <tr>
+          <td><code>UseTypo</code></td>
+          <td><a href="https://learn.microsoft.com/en-us/typography/opentype/spec/os2#fsSelection"><code>USE_TYPO_METRICS</code></a></td>
+          <td>Bit 7 of OS/2 <code>fsSelection</code>. <code>set</code> means the typo line box is the one apps should use for line spacing. <code>clear</code> means that bit is off. OS/2 version 4 or newer is required for the bit to exist.</td>
+        </tr>
+      </tbody>
+    </table>
 
     <h2>Sliders</h2>
     <p>Printed under the group, one block per variable font. The axes, whether line spacing stays the same, and whether a slider end passes the clipping box, as a percent of the em. A small percent is a hairline at reading size. Static fonts have no block.</p>

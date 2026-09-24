@@ -45,7 +45,7 @@
       </li>
       <li>
         <span class="term">Apply</span>
-        Write metrics in place (unless <code>-n</code>). Enable <code>USE_TYPO_METRICS</code> when OS/2 ≥ 4. Zero line gaps. <code>probe</code> does not write.
+        Write metrics in place (unless <code>-n</code>). Enable <a href="https://learn.microsoft.com/en-us/typography/opentype/spec/os2#fsSelection"><code>USE_TYPO_METRICS</code></a> when OS/2 ≥ 4. Zero line gaps. <code>probe</code> does not write.
       </li>
     </ol>
 
@@ -95,12 +95,12 @@
 
     <h2>Variable fonts</h2>
     <div class="callout warn">
-      <strong>Default instance only.</strong> <code>family</code>, <code>individual</code>, and <code>superfamily</code> read and write the default instance the same way they treat a static font. They do not rewrite MVAR or HVAR. <code>probe</code> reads that same default instance and does not write.
+      <strong>Default instance only.</strong> <code>family</code>, <code>individual</code>, and <code>superfamily</code> read and write the default instance the same way they treat a static font. They do not rewrite <a href="https://learn.microsoft.com/en-us/typography/opentype/spec/mvar">MVAR</a> or <a href="https://learn.microsoft.com/en-us/typography/opentype/spec/hvar">HVAR</a>. <code>probe</code> reads that same default instance and does not write.
     </div>
 
     <h2>What stays untouched</h2>
     <ul>
-      <li><code>unitsPerEm</code></li>
+      <li><a href="https://learn.microsoft.com/en-us/typography/opentype/spec/head#unitsPerEm"><code>unitsPerEm</code></a></li>
       <li>Glyph outlines and advances</li>
       <li>Name tables (use FontNameID for those)</li>
     </ul>

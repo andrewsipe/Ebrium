@@ -88,8 +88,8 @@
     </figure>
 
     <ul>
-      <li><span class="term">typoAscender / typoDescender / typoLineGap</span> (OS/2) and matching <span class="term">hhea</span> values define the line box many apps use when <code>USE_TYPO_METRICS</code> is on (OS/2 v4+).</li>
-      <li><span class="term">usWinAscent / usWinDescent</span> are clipping bounds. Family-wide Win uses normalized extremes so nothing clips; decorative outliers can expand Win while still inheriting typo from the core cluster.</li>
+      <li><a href="https://learn.microsoft.com/en-us/typography/opentype/spec/os2#sTypoAscender"><code>sTypoAscender</code></a> / <a href="https://learn.microsoft.com/en-us/typography/opentype/spec/os2#sTypoDescender"><code>sTypoDescender</code></a> / <a href="https://learn.microsoft.com/en-us/typography/opentype/spec/os2#sTypoLineGap"><code>sTypoLineGap</code></a> (OS/2) and matching <a href="https://learn.microsoft.com/en-us/typography/opentype/spec/hhea"><code>hhea</code></a> values define the line box many apps use when <a href="https://learn.microsoft.com/en-us/typography/opentype/spec/os2#fsSelection"><code>USE_TYPO_METRICS</code></a> is on (OS/2 v4+).</li>
+      <li><a href="https://learn.microsoft.com/en-us/typography/opentype/spec/os2#usWinAscent"><code>usWinAscent</code></a> / <a href="https://learn.microsoft.com/en-us/typography/opentype/spec/os2#usWinDescent"><code>usWinDescent</code></a> are clipping bounds. Family-wide Win uses normalized extremes so nothing clips; decorative outliers can expand Win while still inheriting typo from the core cluster.</li>
       <li>Line gaps are set to <strong>zero</strong> across typo and hhea.</li>
     </ul>
 
