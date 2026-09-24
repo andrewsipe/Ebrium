@@ -39,8 +39,8 @@ ebrium family /path/to/fonts -r -n
 # Skip confirmation
 ebrium family /path/to/fonts -r -y
 
-# Impact report (implies dry-run) — see docs for reading the output
-ebrium family /path/to/fonts -r --report
+# Read-only metrics: geometry, stored metrics, family pull, variable sliders
+ebrium probe /path/to/fonts -r
 
 # One font at a time (no family pull)
 ebrium individual /path/to/fonts -r
@@ -48,19 +48,11 @@ ebrium individual /path/to/fonts -r
 # Merge families that share a name prefix
 ebrium superfamily /path/to/fonts -r
 
-# Variable fonts: these subcommands rewrite the default instance only.
-# probe reports whether the line box already moves, and whether a flat Win
-# box is overflowed at the axis poles. It does not write.
-ebrium probe /path/to/variable-fonts -r
-
-# A few files: em, line spacing, outlines, and the clipping box
-ebrium probe /path/to/fonts
-
-# The same facts, spelled out
-ebrium probe /path/to/fonts -vv
+# Variable fonts are included at the default instance. Slider facts print under the group.
+# probe does not write fonts. -o writes the table rows.
 ```
 
-By default, matching fonts are **modified in place** (no backup). Use `-n` or `--report` first.
+By default, matching fonts are **modified in place** (no backup). Use `-n` first. `probe` only reads.
 
 ## What it does (in short)
 
@@ -71,7 +63,7 @@ By default, matching fonts are **modified in place** (no backup). Use `-n` or `-
 
 Decorative outliers can inherit typo metrics while expanding Win bounds. Line gaps go to zero; `USE_TYPO_METRICS` is set when OS/2 version ≥ 4.
 
-For the line-box picture, how to read a run, clustering logic, every flag, and `--report`, use the [doc site](https://www.andrewsipe.com/Ebrium/).
+For the line-box picture, how to read a run, clustering logic, every flag, and `probe`, use the [doc site](https://www.andrewsipe.com/Ebrium/).
 
 ## Related
 

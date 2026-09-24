@@ -26,79 +26,45 @@
   </header>
 
   <main>
-    <p class="meta">--report</p>
+    <p class="meta">probe</p>
     <h1>Report lookup</h1>
     <p class="lede">
-      <code>ebrium family … --report</code> (or <code>superfamily</code>) prints a dry-run impact analysis: how much each style’s planned ascender differs from what it would get alone. Implies <code>-n</code> — nothing is written to the fonts (a checkpoint file may still be written).
+      <code>ebrium probe</code> prints read-only metrics, one group at a time. Nothing is written to the fonts. The driver — the font with the tallest measured ascenders — is the magenta filename and the first row. The other rows run from the smallest pull to the largest.
     </p>
 
-    <h2>Sample shape</h2>
-    <div class="report-sample" aria-label="Example report output"><span class="hi">Family Normalization Impact Report</span>
+    <h2>Default</h2>
+    <p>Fits a half-width terminal. Cap height and x-height are measured from the outlines. Pull is how far sharing the family plan would move that font’s ascender compared with measuring it alone.</p>
+    <div class="report-sample" aria-label="Default probe table"><span class="hi">Sans — 3 fonts — driver Sans-Black.ttf</span>
 
-Font Sans (3 fonts)
+File               UPM   Cap  xHt  Pull
+<span class="ok">Sans-Black.ttf     1000  710  500  0u (+0.0%)</span>
+Sans-Bold.ttf      1000  705  490  +50u (+6.5%)
+Sans-Regular.ttf   1000  700  480  +70u (+8.5%)</div>
 
-  Family ascender: 0.8200 (normalized)
-  Driven by: Sans-Black.ttf (asc: 820)
+    <h2><code>-v</code></h2>
+    <p>Adds a second table. Each cell is ascent / descent / line gap, except Win, which is ascent / descent. These are the values stored in the font now.</p>
+    <div class="report-sample" aria-label="Verbose probe table">File               hhea A/D/L    sTypo A/D/L   usWin A/D   UseTypo
+<span class="ok">Sans-Black.ttf     820/-205/0    820/-205/0    840/210     set</span>
+Sans-Bold.ttf      800/-200/0    800/-200/0    820/205     set</div>
 
-  <span class="warn-line">↑ Sans-Regular.ttf    +  70 units (+8.5%) - pulled up by family</span>
-  <span class="warn-line">↑ Sans-Bold.ttf       +  50 units (+6.5%) - pulled up by family</span>
-  <span class="ok">✓ Sans-Black.ttf      ±   0 units (+0.0%) - minimal impact</span>
+    <h2><code>-vv</code></h2>
+    <p>One wide table. <code>hheaA</code>, <code>hheaD</code>, <code>hheaLG</code>, <code>sTypoA</code>, <code>sTypoD</code>, <code>sTypoLG</code>, <code>WinA</code>, and <code>WinD</code> are each their own column, along with UPM, cap, x-height, <code>UseTypo</code>, and pull.</p>
 
-  <span class="warn-line">High normalization impact detected (8.5% max adjustment)</span>
-      Consider the individual subcommand for heavily affected fonts
-      Or use --max-adjustment 6.8 to limit adjustment</div>
+    <h2>Sliders</h2>
+    <p>Printed under the group, one block per variable font. The axes, whether line spacing stays the same, and whether a slider end passes the clipping box, as a percent of the em. A small percent is a hairline at reading size. Static fonts have no block.</p>
 
-    <h2>Line by line</h2>
-    <table>
-      <thead>
-        <tr><th>You see</th><th>It means</th></tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td><span class="term">Family ascender: N (normalized)</span></td>
-          <td>Family-wide planned ascender as a fraction of UPM (same plan, scaled per font later).</td>
-        </tr>
-        <tr>
-          <td><span class="term">Driven by: file (asc: …)</span></td>
-          <td>The font with the tallest measured ascenders. The planned family ascender can still come from cap height plus headroom, rather than that font’s ascender alone.</td>
-        </tr>
-        <tr>
-          <td><code>↑</code> … pulled up by family</td>
-          <td>This font’s solo plan is shorter; sharing the family plan raises its ascender (units and %).</td>
-        </tr>
-        <tr>
-          <td><code>↓</code> … pulled down by family</td>
-          <td>Rare: family plan is shorter than the font’s solo plan.</td>
-        </tr>
-        <tr>
-          <td><code>✓</code> … minimal impact</td>
-          <td>Absolute change under ~1% — effectively the driver or already aligned.</td>
-        </tr>
-        <tr>
-          <td>High normalization impact…</td>
-          <td>Max |pull| over 8%. Suggestions: run <code>individual</code> for outliers, or lower <code>--max-adjustment</code>.</td>
-        </tr>
-        <tr>
-          <td>Uniwidth families</td>
-          <td>Summary of families flagged as fixed-advance; normalization reinforces that intent.</td>
-        </tr>
-        <tr>
-          <td>single-font families skipped</td>
-          <td>No pull analysis when the group has one font — there is no second style to compare. The font is still normalized on a normal run.</td>
-        </tr>
-      </tbody>
-    </table>
+    <h2>Spreadsheet</h2>
+    <p><code>-o probe.tsv</code> writes one row per font, with every hhea, typo, and Win value in its own column, plus the slider note. A relative path is saved at the top of the folder you probed. <code>-q</code> keeps the terminal to a progress bar and the count.</p>
 
     <h2>What to do next</h2>
     <ul>
-      <li><strong>Pulls look fine</strong> — drop <code>--report</code> and run with <code>-y</code> if you’re ready, or leave the prompt on.</li>
-      <li><strong>One style is dragged hard</strong> — process it with <code>individual</code>, or exclude it from measuring / group it differently.</li>
-      <li><strong>Whole family too aggressive</strong> — tighten <code>--max-adjustment</code>, or inspect clustering with/without <code>--no-cluster</code>.</li>
-      <li><strong>Names grouped wrong</strong> — <code>--ignore-term</code>, <code>--merge</code>, or switch to <code>superfamily</code> / <code>--exclude</code>.</li>
+      <li><strong>Pulls look fine</strong> — run <code>family</code> with <code>-n</code> first, then <code>-y</code> if you’re ready.</li>
+      <li><strong>One style is dragged hard</strong> — process it with <code>individual</code>, or group it differently.</li>
+      <li><strong>Names grouped wrong</strong> — <code>probe --ignore-term</code>, <code>--merge</code>, or <code>--superfamily</code> / <code>--exclude</code>.</li>
     </ul>
 
     <div class="callout">
-      <strong>Not the same as the change preview.</strong> A normal run lists the metric writes. <a href="terminal.html">Reading a run</a> walks through that printout. <code>--report</code> compares family vs solo ascender impact. Use both when diagnosing a surprising plan.
+      <strong>Not the same as the change preview.</strong> A normal run lists the metric writes. <a href="terminal.html">Reading a run</a> walks through that printout. <code>probe</code> compares family vs solo ascender impact and does not write.
     </div>
   </main>
 

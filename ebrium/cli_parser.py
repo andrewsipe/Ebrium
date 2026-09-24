@@ -93,7 +93,7 @@ MODE_SUMMARY = {
     "individual": "normalize each font on its own; no grouping or clustering",
     "family": "group by family name; cluster within each family (add --no-cluster to skip clustering)",
     "superfamily": "merge families sharing a name prefix; cluster across the superfamily",
-    "probe": "read-only report: does the line box already move, and do axis poles overflow a flat Win box?",
+    "probe": "read-only metrics tables: geometry, stored metrics, family pull, and variable-font slider facts",
 }
 
 # Coupled to inline tables under "line box (typo / hhea)" and "detection
@@ -139,7 +139,6 @@ COMBINE_NOTE = (
 PANEL_ROWS_BASIC = [("Preview only", "-n, --dry-run")]
 PANEL_ROWS_WITH_REPORT = [
     ("Preview only", "-n, --dry-run"),
-    ("Family vs per-font analysis", "--report  (implies -n)"),
 ]
 PANEL_MESSAGE = (
     "Fonts are modified in place: no backup and no output directory. "
@@ -167,13 +166,6 @@ def _add_input_args(g: Any) -> None:
 def _add_preview_args(g: Any) -> None:
     g.add_argument("-n", "--dry-run", action="store_true", help="preview changes without writing")
     g.add_argument("-y", "--yes", action="store_true", help="skip the 'Proceed? [y/N]' prompt")
-
-
-def _add_report_arg(g: Any) -> None:
-    g.add_argument(
-        "--report", action="store_true",
-        help="detailed family vs per-font analysis (implies --dry-run)",
-    )
 
 
 def _add_spacing_args(g: Any, *, include_max_adjustment: bool = True) -> None:
@@ -341,7 +333,6 @@ def _build_family(subparsers: Any) -> None:
     examples = [
         ("ebrium family fonts/ -r", "normalize a tree by family (asks before writing)"),
         ("ebrium family fonts/ -r -n", "preview the changes"),
-        ("ebrium family fonts/ -r --report", "family vs per-font analysis (implies -n)"),
         ("ebrium family fonts/ -r -y", "skip the confirmation prompt"),
         ("ebrium family fonts/ --no-cluster", "skip clustering (unpredictable / mis-detected metrics)"),
         ("ebrium family fonts/ --ignore-term Adobe", "drop a shared word before grouping"),
@@ -378,7 +369,6 @@ def _build_family(subparsers: Any) -> None:
     )
     _add_input_args(g_in)
     _add_preview_args(g_run)
-    _add_report_arg(g_run)
     _add_grouping_mod_args(p, g_mod)
     g_cluster.add_argument(
         "--no-cluster", action="store_true",
@@ -413,7 +403,6 @@ def _build_superfamily(subparsers: Any) -> None:
 
     examples = [
         ("ebrium superfamily fonts/ -r", "merge shared-prefix families into one group"),
-        ("ebrium superfamily fonts/ -r --report", "family vs per-font analysis (implies -n)"),
         ("ebrium superfamily fonts/ --exclude Mono", "keep a family out of the merge"),
         ("ebrium superfamily fonts/ --ignore-term Adobe", "drop a shared word before grouping"),
         ('ebrium superfamily fonts/ --merge "A,B"', "merge two families before the prefix merge"),
@@ -449,7 +438,6 @@ def _build_superfamily(subparsers: Any) -> None:
     )
     _add_input_args(g_in)
     _add_preview_args(g_run)
-    _add_report_arg(g_run)
     _add_grouping_mod_args(p, g_mod)
     g_mod.add_argument(
         "-e", "--exclude", action="append", metavar="FAMILY",
@@ -466,22 +454,20 @@ def _build_probe(subparsers: Any) -> None:
         "probe",
         usage="%(prog)s [options] [PATH ...]",
         allow_abbrev=False,
-        description="Read-only report for variable fonts: whether the typo line box "
-        "already moves, and whether axis poles overflow a flat Win clipping box. "
+        description="Read-only metrics for every font. Groups by family, shows the "
+        "driver and each font's pull, and lists slider facts for variable fonts. "
         "Does not modify fonts.",
         add_help=False,
     )
     g_in = p.add_argument_group("input")
+    g_mod = p.add_argument_group("grouping")
     g_out = p.add_argument_group("report")
     g_gen = p.add_argument_group("general")
 
     examples = [
-        ("ebrium probe fonts/ -r", "metrics for each variable font"),
-        ("ebrium probe fonts/ -r -vv", "the same metrics, with the measurements spelled out"),
-        (
-            "ebrium probe fonts/ -r -q -o probe.tsv",
-            "corpus run: current filename, progress bar, tally, and a spreadsheet",
-        ),
+        ("ebrium probe fonts/ -r", "metrics tables, grouped by family"),
+        ("ebrium probe fonts/ -r --superfamily", "group by shared name prefix"),
+        ("ebrium probe fonts/ -r -q -o probe.tsv", "write the same rows to a spreadsheet"),
     ]
 
     _add_help(
@@ -493,6 +479,15 @@ def _build_probe(subparsers: Any) -> None:
             line_section("formats", FORMATS_LINE),
             docs_section(DOCS_URL),
         ],
+    )
+    g_mod.add_argument(
+        "--superfamily", action="store_true",
+        help="group by shared name prefix instead of family name",
+    )
+    _add_grouping_mod_args(p, g_mod)
+    g_mod.add_argument(
+        "-e", "--exclude", action="append", metavar="FAMILY",
+        help="with --superfamily, keep FAMILY out of the merge",
     )
     g_out.add_argument(
         "-o", "--output", metavar="FILE",
@@ -506,7 +501,7 @@ def _build_probe(subparsers: Any) -> None:
         "per-font lines go to --output only",
     )
     _add_general_args(
-        g_gen, "-vv spells out the same metrics in full sentences"
+        g_gen, "-v adds the compact hhea, typo, and Win table; -vv uses one table with each value in its own column"
     )
     _add_input_args(g_in)
 

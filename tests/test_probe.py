@@ -14,12 +14,14 @@ from fontTools.ttLib.tables.TupleVariation import TupleVariation
 from fontTools.ttLib.tables._f_v_a_r import Axis, table__f_v_a_r
 from fontTools.ttLib.tables._g_v_a_r import table__g_v_a_r
 
+from types import SimpleNamespace
+
+from ebrium.probe_report import collect_groups, present
 from ebrium.variation_probe import (
     CLIP_TAGS,
     _moving,
     metrics_brief,
     report_destination,
-    run_probe,
     survey_font,
 )
 
@@ -114,24 +116,39 @@ class ProbeSurveyTest(unittest.TestCase):
             font_path = Path(tmp) / "overflow.ttf"
             report_path = Path(tmp) / "probe.tsv"
             _write_variable(font_path, win_ascent=700, raise_top=200)
-            run_probe([str(font_path)], quiet=True, output=str(report_path))
+            present(
+                collect_groups([str(font_path)], SimpleNamespace(
+                    grouping_mode="family", combine=None, ignore_term=None, exclude=None, verbose=0,
+                )),
+                quiet=True,
+                output=str(report_path),
+                source_paths=[str(font_path)],
+            )
             with report_path.open(newline="", encoding="utf-8") as handle:
                 rows = list(csv.DictReader(handle, delimiter="\t"))
         self.assertEqual(len(rows), 1)
-        self.assertEqual(rows[0]["em"], "1000")
-        self.assertEqual(rows[0]["line_spacing"], "stays the same")
-        self.assertIn("20% of the em", rows[0]["slider_ends"])
+        self.assertEqual(rows[0]["upm"], "1000")
+        self.assertEqual(rows[0]["driver"], "yes")
+        self.assertIn("hhea_gap", rows[0])
+        self.assertIn("20% of the em", rows[0]["sliders"])
 
     def test_a_pass_is_left_out_of_the_baseline_report(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             font_path = Path(tmp) / "covered.ttf"
             report_path = Path(tmp) / "probe.tsv"
             _write_variable(font_path, win_ascent=900, raise_top=200)
-            run_probe([str(font_path)], quiet=True, output=str(report_path))
+            present(
+                collect_groups([str(font_path)], SimpleNamespace(
+                    grouping_mode="family", combine=None, ignore_term=None, exclude=None, verbose=0,
+                )),
+                quiet=True,
+                output=str(report_path),
+                source_paths=[str(font_path)],
+            )
             with report_path.open(newline="", encoding="utf-8") as handle:
                 rows = list(csv.DictReader(handle, delimiter="\t"))
         self.assertEqual(len(rows), 1)
-        self.assertEqual(rows[0]["slider_ends"], "stay inside the box")
+        self.assertIn("stay inside the clipping box", rows[0]["sliders"])
 
     def test_relative_report_is_saved_in_the_probed_directory(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -141,17 +158,21 @@ class ProbeSurveyTest(unittest.TestCase):
             _write_variable(font_path, win_ascent=700, raise_top=200)
             placed = Path(report_destination("probe.tsv", [str(font_dir)]))
             self.assertEqual(placed.resolve(), (font_dir / "probe.tsv").resolve())
-            run_probe(
-                [str(font_path)],
+            present(
+                collect_groups([str(font_path)], SimpleNamespace(
+                    grouping_mode="family", combine=None, ignore_term=None, exclude=None, verbose=0,
+                )),
                 quiet=True,
                 output="probe.tsv",
                 source_paths=[str(font_dir)],
             )
             self.assertTrue(placed.is_file())
 
-    def test_quiet_and_verbose_are_rejected(self) -> None:
+    def test_family_rejects_report_flag(self) -> None:
+        from ebrium.cli_parser import build_parser
+
         with self.assertRaises(SystemExit) as raised:
-            run_probe(["unused.ttf"], quiet=True, verbose=True)
+            build_parser().parse_args(["family", "--report"])
         self.assertEqual(raised.exception.code, 2)
 
     def test_clipping_tag_range_counts_as_already_varied(self) -> None:

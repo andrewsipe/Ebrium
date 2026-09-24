@@ -97,7 +97,7 @@
     <p><code>--letter-height</code> (default 130% of UPM) is a <strong>floor</strong> for the letter span when auto-adjust is on — large x-heights may raise it. <code>--top-margin</code> (default 25%) asks for headroom above capitals; it can be ignored when actual ascenders already clear it. Use <code>--no-auto-adjust</code> for exactly the percentages you typed.</p>
 
     <h2>Family pull</h2>
-    <p>When several fonts share a family plan, a style with smaller solo ascenders can be <em>pulled up</em> toward the family driver. That’s intentional for a shared line box. <code>--report</code> quantifies it; <code>--max-adjustment</code> caps it; <code>individual</code> avoids it entirely.</p>
+    <p>When several fonts share a family plan, a style with smaller solo ascenders can be <em>pulled up</em> toward the family driver. That’s intentional for a shared line box. <code>probe</code> quantifies it; <code>--max-adjustment</code> caps it; <code>individual</code> avoids it entirely.</p>
 
     <h2 id="assume">Detection labels</h2>
     <p>Filename or measurement heuristics can mark fonts as script, decorative, unicase, or uniwidth. When a file is missed, force it with <code>-a/--assume TYPE:PATTERN</code>. The pictures use stand-in typefaces so the categories are visible. In the script and decorative pictures, the solid box is the shared line box and the dashed box is the clipping box. <code>--exclude-measuring</code> keeps a font out of the family math without classifying it.</p>
@@ -158,7 +158,7 @@
 
     <h2>Checkpoint</h2>
     <div class="callout warn">
-      <strong>A cache file is written.</strong> Every measuring run, including <code>-n</code> and <code>--report</code>, writes <code>.metrics_checkpoint.json</code> in the current working directory. <code>probe</code> reads instances for its report and does not write one.
+      <strong>A cache file is written.</strong> Every measuring run, including <code>-n</code>, writes <code>.metrics_checkpoint.json</code> in the current working directory. <code>probe</code> does not write one.
     </div>
     <p>The file caches measurements and clusters, and it resets when the options or the font set change.</p>
   </main>

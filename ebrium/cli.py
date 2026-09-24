@@ -36,7 +36,6 @@ load_measurements_checkpoint = checkpoints.load_measurements_checkpoint
 group_families = grouping.group_families
 build_plans = planning.build_plans
 report_changes = validation.report_changes
-generate_family_report = validation.generate_family_report
 process_all = application.process_all
 confirm_or_exit = validation.confirm_or_exit
 validate_args = validation.validate_args
@@ -68,14 +67,22 @@ def main() -> None:
         if not files_probe:
             cs.StatusIndicator("error").add_message("No font files found").emit(console)
             sys.exit(1)
-        from . import variation_probe
+        from .probe_report import collect_groups, present
 
-        variation_probe.run_probe(
-            files_probe,
-            verbose=int(args.verbose or 0),
+        if getattr(args, "superfamily", False):
+            args.grouping_mode = "superfamily"
+        else:
+            args.grouping_mode = "family"
+        groups = collect_groups(files_probe, args)
+        if not groups:
+            cs.StatusIndicator("error").add_message("No measurable fonts found").emit(console)
+            sys.exit(2)
+        present(
+            groups,
             quiet=bool(getattr(args, "quiet", False)),
             output=getattr(args, "output", None),
             source_paths=source_paths,
+            verbose=int(args.verbose or 0),
         )
         elapsed = time.time() - start_time
         cs.emit(
@@ -85,10 +92,6 @@ def main() -> None:
         sys.exit(0)
 
     validate_args(args)
-
-    # --report implies --dry-run
-    if args.report:
-        args.dry_run = True
 
     # Convert percentage inputs to internal fraction representation
     config = MetricsConfig(
@@ -313,15 +316,6 @@ def main() -> None:
     save_measurements_checkpoint(
         measures, checkpoint_path, config=config, clusters=clusters_cache
     )
-
-    if args.report:
-        # Generate detailed impact report
-        generate_family_report(families, config, args)
-        cs.emit("")
-        cs.StatusIndicator("info").add_message(
-            "Report complete. Use --dry-run to preview changes or remove --report to apply."
-        ).emit(console)
-        sys.exit(0)
 
     any_changes_needed = report_changes(families, family_plans, args, forced_groups)
 

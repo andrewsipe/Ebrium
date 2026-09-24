@@ -45,7 +45,7 @@
         </tr>
         <tr>
           <td><code>family</code></td>
-          <td><code>--no-cluster</code>, <code>--merge</code>, <code>--ignore-term</code>, <code>--line-box*</code>, <code>--report</code>, <code>--max-adjustment</code></td>
+          <td><code>--no-cluster</code>, <code>--merge</code>, <code>--ignore-term</code>, <code>--line-box*</code>, <code>--max-adjustment</code></td>
         </tr>
         <tr>
           <td><code>superfamily</code></td>
@@ -53,12 +53,12 @@
         </tr>
         <tr>
           <td><code>probe</code></td>
-          <td>Input, <code>-q</code>, <code>-o</code>, <code>-v</code>. Line box and Win clipping report, then a tally.</td>
+          <td>Read-only metrics tables grouped by family. <code>--superfamily</code>, <code>--merge</code>, <code>--ignore-term</code>, <code>--exclude</code>, <code>-q</code>, <code>-o</code>.</td>
         </tr>
       </tbody>
     </table>
     <div class="callout warn">
-      <strong>Variable fonts.</strong> <code>family</code>, <code>individual</code>, and <code>superfamily</code> rewrite the default instance only and leave MVAR and HVAR alone. <code>probe</code> is the read-only check: a line box that already moves is left, and a flat Win box is reported when an axis pole sticks out past the default ink.
+      <strong>Variable fonts.</strong> <code>family</code>, <code>individual</code>, and <code>superfamily</code> rewrite the default instance only and leave MVAR and HVAR alone. <code>probe</code> records that default instance with the rest of the family and does not write.
     </div>
 
     <h2>Shared (individual / family / superfamily)</h2>
@@ -77,7 +77,7 @@
         <tr><td><code>--no-auto-adjust</code></td><td>Use exact <code>--letter-height</code></td></tr>
         <tr><td><code>-a, --assume TYPE:PATTERN</code></td><td>Force classify: <code>script</code>, <code>decorative</code>, <code>unicase</code>, <code>uniwidth</code> (repeatable)</td></tr>
         <tr><td><code>--exclude-measuring PATTERN</code></td><td>Exclude from family calculations (not a classify flag)</td></tr>
-        <tr><td><code>-v / -vv</code></td><td>Verbosity. On <code>probe</code>, <code>-vv</code> spells the metrics out in full sentences.</td></tr>
+        <tr><td><code>-v / -vv</code></td><td>On <code>probe</code>, <code>-v</code> adds a compact hhea / typo / Win table. <code>-vv</code> prints one wide table with each of those values in its own column.</td></tr>
       </tbody>
     </table>
 
@@ -93,11 +93,11 @@
         </tr>
         <tr>
           <td><code>-o, --output FILE</code></td>
-          <td>Tab-separated metrics sheet, one row per font, written as the run goes. Columns are em, sliders, line spacing, default outlines, clipping box, and whether a slider end passes that box. A relative file is saved at the top of the directory you probed.</td>
+          <td>Tab-separated sheet, one row per font. hhea, typo, and Win values are separate columns. A relative file is saved at the top of the directory you probed.</td>
         </tr>
         <tr>
           <td><code>-v</code></td>
-          <td><code>-vv</code> spells the metrics out in full sentences.</td>
+          <td><code>-v</code> adds the compact hhea / typo / Win table. <code>-vv</code> prints one wide table with each value in its own column.</td>
         </tr>
       </tbody>
     </table>
@@ -131,7 +131,6 @@
           <td>Drop a whole word from family names before grouping (case-sensitive, anywhere; repeatable or comma-separated)</td>
         </tr>
         <tr><td><code>-e, --exclude FAMILY</code></td><td><code>superfamily</code> only — keep a family out of the merge</td></tr>
-        <tr><td><code>--report</code></td><td>Family vs per-font analysis (implies <code>-n</code>)</td></tr>
         <tr>
           <td><code>-b, --line-box MODE</code></td>
           <td><code>auto</code> | <code>force-baseline</code> | <code>force-baseline-main-cluster</code> | <code>safe-hhea</code></td>
@@ -154,9 +153,6 @@
     <h2>Recipes</h2>
     <pre><code># Preview family plan
 ebrium family fonts/ -r -n
-
-# Impact report before writing
-ebrium family fonts/ -r --report
 
 # Unpredictable metrics: skip clustering
 ebrium family fonts/ -r --no-cluster

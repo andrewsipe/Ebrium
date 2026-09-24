@@ -13,9 +13,10 @@
 - `probe` now reports whether the typo line box already moves, and whether
   a flat Win clipping box is overflowed at an axis pole past the default
   ink. The run ends with a tally. HVAR is no longer part of the report.
-- `probe` is a metrics report, not an adjustment. Each font gets its em,
-  sliders, whether line spacing stays put, where the default outlines and
-  the clipping box sit, and whether a slider end passes that box.
+- `probe` is the read-only metrics tool. It groups by family (or
+  `--superfamily`), prints one table per group with the driver first and
+  pull from least to most, and lists slider facts for variable fonts.
+  `--report` is removed from `family` and `superfamily`.
 - `probe -q` shows the current filename and a progress bar, then the tally.
   `probe -o FILE` writes a tab-separated row per font as the run goes.
   A relative file is saved at the top of the directory that was probed.

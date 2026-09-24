@@ -100,7 +100,7 @@ FontCore is vendored (console + collector + sorter + CLI help); no submodule.
 
 ## Known behavior (documented in `--help` notes)
 
-- Even `-n` / `--report` write `.metrics_checkpoint.json` in the **current** directory
+- Even `-n` writes `.metrics_checkpoint.json` in the **current** directory
   (`probe` reads instances for its report and never writes one)
 - Exit code `2` is used both for “no measurable fonts” and by argparse for bad args
 
