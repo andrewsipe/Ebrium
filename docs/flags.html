@@ -41,7 +41,7 @@
       <tbody>
         <tr>
           <td><code>individual</code></td>
-          <td>No clustering or report flags; no <code>--max-adjustment</code></td>
+          <td>Same centered box per file; no <code>--max-adjustment</code></td>
         </tr>
         <tr>
           <td><code>family</code></td>
@@ -72,10 +72,9 @@
         <tr><td><code>--use-ttx</code></td><td>Also process <code>.ttx</code> files</td></tr>
         <tr><td><code>-n, --dry-run</code></td><td>Preview without writing</td></tr>
         <tr><td><code>-y, --yes</code></td><td>Skip confirmation prompt</td></tr>
-        <tr><td><code>-l, --letter-height %</code></td><td>Letter-span floor (default 130); auto-adjust may raise it</td></tr>
-        <tr><td><code>-t, --top-margin %</code></td><td>Headroom above caps (default 25); may be ignored if already clear</td></tr>
-        <tr><td><code>--no-auto-adjust</code></td><td>Use exact <code>--letter-height</code></td></tr>
-        <tr><td><code>-a, --assume TYPE:PATTERN</code></td><td>Force classify: <code>script</code>, <code>decorative</code>, <code>unicase</code>, <code>uniwidth</code> (repeatable)</td></tr>
+        <tr><td><code>-l, --letter-height %</code></td><td>Letter-span floor (default 130). Measured accent or descender clearance may raise the box above it</td></tr>
+        <tr><td><code>-t, --top-margin %</code></td><td>Headroom above caps (default 25); may be ignored if ascenders already clear it</td></tr>
+        <tr><td><code>-a, --assume TYPE:PATTERN</code></td><td>Force a membership: <code>script</code> and <code>decorative</code> inherit the line box; <code>unicase</code> uses less headroom; <code>uniwidth</code> is a label only</td></tr>
         <tr><td><code>--exclude-measuring PATTERN</code></td><td>Exclude from family calculations (not a classify flag)</td></tr>
         <tr><td><code>-v / -vv</code></td><td>On <code>probe</code>, <code>-v</code> adds a compact hhea / typo / Win table. <code>-vv</code> prints one wide table with each of those values in its own column.</td></tr>
       </tbody>
@@ -110,7 +109,7 @@
       <tbody>
         <tr>
           <td><code>--no-cluster</code></td>
-          <td>Skip clustering; bbox extremes for every font. For unpredictable or mis-detected metrics. Default is to cluster. Formerly <code>--safe-max</code>.</td>
+          <td>Use outline extremes for the line box instead of the shared cap-centered plan. Formerly <code>--safe-max</code>.</td>
         </tr>
       </tbody>
     </table>
@@ -121,7 +120,7 @@
         <tr><th>Flag</th><th>Meaning</th></tr>
       </thead>
       <tbody>
-        <tr><td><code>--max-adjustment %</code></td><td>Cap how far family extremes may pull a font</td></tr>
+        <tr><td><code>--max-adjustment %</code></td><td>Cap how far a style may be pulled into the shared line box</td></tr>
         <tr>
           <td><code>-m, --merge "A,B"</code></td>
           <td>One complete group per flag. Repeat <code>--merge</code> for separate groups. <code>-m A -m B</code> does <strong>not</strong> merge A with B. Formerly <code>-c</code> / <code>--combine</code>.</td>
@@ -133,11 +132,11 @@
         <tr><td><code>-e, --exclude FAMILY</code></td><td><code>superfamily</code> only — keep a family out of the merge</td></tr>
         <tr>
           <td><code>-b, --line-box MODE</code></td>
-          <td><code>auto</code> | <code>force-baseline</code> | <code>force-baseline-main-cluster</code> | <code>safe-hhea</code></td>
+          <td><code>auto</code> is the shared centered line box. <code>force-baseline</code> copies one style's box onto the family. <code>force-baseline-main-cluster</code> picks that style from the core only. <code>safe-hhea</code> averages the values already stored in the files.</td>
         </tr>
         <tr>
           <td><code>--line-box-from PATH_OR_GLOB</code></td>
-          <td>Pin reference font; implies <code>force-baseline</code> if mode left at <code>auto</code></td>
+          <td>Name the style whose line box is copied onto the family. Implies <code>force-baseline</code> if the mode is still <code>auto</code></td>
         </tr>
       </tbody>
     </table>
@@ -154,13 +153,13 @@
     <pre><code># Preview family plan
 ebrium family fonts/ -r -n
 
-# Unpredictable metrics: skip clustering
+# Line box from outline extremes
 ebrium family fonts/ -r --no-cluster
 
-# Force two families into one group before clustering
+# Two families, one line box
 ebrium family fonts/ -r --merge "Display,DisplayAlt"
 
-# Unify line box from the main optical cluster
+# Copy the core style's line box onto the family
 ebrium family fonts/ -r -b force-baseline-main-cluster
 
 # Superfamily, leave one family alone

@@ -2,7 +2,34 @@
 
 ## Unreleased
 
+### Removed
+- `ebrium springy` subcommand and `ebrium/springy.py`. The soft-span /
+  x-height-attract path is gone; use `family` / `superfamily` / `individual`.
+
+### Added
+- Families that include a Face cut now treat effect styles (Shadow, Extrude,
+  Outline, Fine, Inline, and similar) as decorative outliers: they inherit
+  the Face typo box and do not set the floor. `--assume decorative` peels a
+  style the same way even when the name has no Face token.
+- A peer group that mixes optical-size names (Caption, Display, Subhead,
+  Small Text, Text, and similar) is unpinned into one line box per size.
+  A single size stays one pinned box. Effect cuts are not optical sizes.
+- A multi-file layered or color set (every file has a color table, or every
+  name is a layer) gets one shared typo box and one shared Win box from the
+  union of the outlines.
+- After planning, a Review block lists only the families that need a look:
+  layered copy, missing accent samples, a span past the letter-height floor,
+  cross-weight spread of cap, x-height, or accent height, and an
+  x-height/cap-height ratio outside 0.65–0.78. Those notes do not change the plan.
+
 ### Changed
+- Line box: capitals stay centered when growing to the letter-height floor
+  (`asc − cap = |desc|`). The old 60/40 expand split is removed. Asymmetry
+  comes only from measured floors (accented capitals, real descenders).
+- X-height no longer raises the letter-height floor (that belongs in CSS
+  leading, not font metrics).
+- Accented-capital yMax is a hard typo-ascender floor. If no sample glyphs
+  exist, the run flags a re-check (report-only).
 - `--safe-max` is now `--no-cluster`. It skips clustering under `family`;
   the old flag still works and is hidden from `--help`.
 - `--combine` / `-c` is now `--merge` / `-m`. Each flag is still one complete

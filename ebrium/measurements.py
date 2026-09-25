@@ -29,6 +29,7 @@ LOWERCASE_XHEIGHT_SAMPLES = config.LOWERCASE_XHEIGHT_SAMPLES
 UPPERCASE_CAPHEIGHT_SAMPLES = config.UPPERCASE_CAPHEIGHT_SAMPLES
 LOWER_ASCENDER_CODEPOINTS = config.LOWER_ASCENDER_CODEPOINTS
 LOWER_DESCENDER_CODEPOINTS = config.LOWER_DESCENDER_CODEPOINTS
+ACCENTED_CAP_CODEPOINTS = config.ACCENTED_CAP_CODEPOINTS
 UNIWIDTH_SAMPLE_CODEPOINTS = config.UNIWIDTH_SAMPLE_CODEPOINTS
 
 # Import font I/O functions
@@ -111,6 +112,24 @@ def _descender_min(font: TTFont) -> Optional[int]:
     if min_y is None:
         return None
     return int(round(min_y))
+
+
+def _accented_cap_max(font: TTFont) -> Tuple[Optional[int], bool]:
+    """Tallest accented-capital yMax (hard typo-ascender floor).
+
+    Returns (yMax, missing). missing=True when none of the sample glyphs exist.
+    """
+    max_y = None
+    for cp in ACCENTED_CAP_CODEPOINTS:
+        b = _codepoint_bounds(font, cp)
+        if not b:
+            continue
+        _, _, _, yMax = b
+        if max_y is None or yMax > max_y:
+            max_y = yMax
+    if max_y is None:
+        return None, True
+    return int(round(max_y)), False
 
 
 def _x_height(font: TTFont) -> Optional[int]:
@@ -454,6 +473,12 @@ def measure_fonts(
                 fm.ascender_max = _ascender_max(font)
                 fm.descender_min = _descender_min(font)
                 fm.x_height = _x_height(font)
+                accented_max, accented_missing = _accented_cap_max(font)
+                fm.accented_cap_max = accented_max
+                fm.accented_cap_missing = accented_missing
+                from .review import font_has_color_table
+
+                fm.is_color_font = font_has_color_table(font)
 
                 # Check if font name suggests unicase (fallback for fonts that don't match geometric pattern)
                 filename_hint = (

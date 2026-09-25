@@ -79,6 +79,9 @@ def save_measurements_checkpoint(
                 "x_height": fm.x_height,
                 "ascender_max": fm.ascender_max,
                 "descender_min": fm.descender_min,
+                "accented_cap_max": fm.accented_cap_max,
+                "accented_cap_missing": fm.accented_cap_missing,
+                "is_color_font": fm.is_color_font,
                 "is_unicase": fm.is_unicase,
                 "is_script": fm.is_script,
                 "is_uniwidth": fm.is_uniwidth,
@@ -155,6 +158,9 @@ def load_measurements_checkpoint(
             fm.x_height = measure_data.get("x_height")
             fm.ascender_max = measure_data.get("ascender_max")
             fm.descender_min = measure_data.get("descender_min")
+            fm.accented_cap_max = measure_data.get("accented_cap_max")
+            fm.accented_cap_missing = measure_data.get("accented_cap_missing", False)
+            fm.is_color_font = measure_data.get("is_color_font", False)
             fm.is_unicase = measure_data.get("is_unicase", False)
             fm.is_script = measure_data.get("is_script", False)
             fm.is_uniwidth = measure_data.get("is_uniwidth", False)

@@ -42,17 +42,17 @@ ebrium family /path/to/fonts -r -n</code></pre>
 
     <p>Pick a subcommand first — that choice is how fonts are grouped, and it decides which flags exist:</p>
     <ul>
-      <li><code>family</code> — group by family name; cluster within each family (usual case)</li>
-      <li><code>individual</code> — each font alone; no family pull</li>
-      <li><code>superfamily</code> — merge families that share a name prefix</li>
-      <li><code>probe</code> — read-only metrics, grouped by family: cap, x-height, stored hhea / typo / Win, pull, and variable-font slider facts</li>
+      <li><code>family</code> — one shared centered line box per family. Optical sizes split. Effect and script cuts inherit</li>
+      <li><code>individual</code> — the same box, per file, with nothing shared</li>
+      <li><code>superfamily</code> — merge families that share a name prefix, then one line box (optical sizes still split)</li>
+      <li><code>probe</code> — read-only metrics, grouped by family: cap, x-height, stored hhea / typo / Win</li>
     </ul>
     <p>Variable fonts: <code>family</code>, <code>individual</code>, and <code>superfamily</code> rewrite the default instance only and leave <a href="https://learn.microsoft.com/en-us/typography/opentype/spec/mvar">MVAR</a> and <a href="https://learn.microsoft.com/en-us/typography/opentype/spec/hvar">HVAR</a> alone. <code>probe</code> reads that default instance along with every static font and does not write.</p>
 
     <div class="card-grid">
       <a class="card" href="concepts.html">
         <h2>Concepts</h2>
-        <p>Cap height, clusters, typo vs Win, decorative outliers — the vocabulary.</p>
+        <p>Cap height, the shared line box, typo vs Win, effect cuts.</p>
       </a>
       <a class="card" href="terminal.html">
         <h2>Reading a run</h2>
@@ -60,7 +60,7 @@ ebrium family /path/to/fonts -r -n</code></pre>
       </a>
       <a class="card" href="logic.html">
         <h2>How it thinks</h2>
-        <p>Measure → cluster → plan → apply, plus checkpoints and spacing floors.</p>
+        <p>Measure, separate the core from effect cuts, plan one centered box, then apply.</p>
       </a>
       <a class="card" href="flags.html">
         <h2>Flag reference</h2>

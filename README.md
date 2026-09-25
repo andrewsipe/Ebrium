@@ -30,7 +30,7 @@ Tests: `python -m unittest discover -s tests`
 Pick a subcommand — how fonts are grouped — then run. There is no default.
 
 ```bash
-# Most common: group by family name, cluster within each family
+# Most common: one centered line box per family
 ebrium family /path/to/fonts -r
 
 # Preview only
@@ -39,13 +39,13 @@ ebrium family /path/to/fonts -r -n
 # Skip confirmation
 ebrium family /path/to/fonts -r -y
 
-# Read-only metrics: geometry, stored metrics, family pull, variable sliders
+# Read-only metrics
 ebrium probe /path/to/fonts -r
 
-# One font at a time (no family pull)
+# Same box, one file at a time
 ebrium individual /path/to/fonts -r
 
-# Merge families that share a name prefix
+# Merge families that share a name prefix, then one line box
 ebrium superfamily /path/to/fonts -r
 
 # Variable fonts are included at the default instance. Slider facts print under the group.
@@ -56,14 +56,14 @@ By default, matching fonts are **modified in place** (no backup). Use `-n` first
 
 ## What it does (in short)
 
-1. **Measures** cap height, x-height, ascenders, descenders, bounds  
-2. **Clusters** optically similar styles (cap height as the stable anchor)  
-3. **Plans** shared typo/hhea metrics and Win extremes that prevent clipping  
-4. **Applies** those metrics to the fonts  
+1. **Measures** cap height, x-height, ascenders, descenders, accented capitals, and bounds  
+2. **Shares** one centered line box across the core styles in a family  
+3. **Inherits** that box for effect and script cuts, while Win covers their outlines  
+4. **Applies** typo, hhea, a zero line gap, and `USE_TYPO_METRICS` when OS/2 version ≥ 4  
 
-Decorative outliers can inherit typo metrics while expanding Win bounds. Line gaps go to zero; `USE_TYPO_METRICS` is set when OS/2 version ≥ 4.
+Optical sizes named Caption, Display, Subhead, or Small Text each keep their own box. A layered or color stack copies one box across every layer file.
 
-For the line-box picture, how to read a run, clustering logic, every flag, and `probe`, use the [doc site](https://www.andrewsipe.com/Ebrium/).
+For the line-box picture, how to read a run, every flag, and `probe`, use the [doc site](https://www.andrewsipe.com/Ebrium/).
 
 ## Related
 

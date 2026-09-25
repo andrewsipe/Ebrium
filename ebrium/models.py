@@ -17,6 +17,14 @@ class FontMeasures:
         self.x_height: Optional[int] = None
         self.ascender_max: Optional[int] = None
         self.descender_min: Optional[int] = None
+        # Tallest accented capital yMax (hard typo-ascender floor). None if unmeasured.
+        self.accented_cap_max: Optional[int] = None
+        # True when no accented-cap sample existed; estimate was used / needs re-check.
+        self.accented_cap_missing: bool = False
+        # COLR, SVG, CBDT, or sbix — a color/layer font file.
+        self.is_color_font: bool = False
+        # Set when this file was stamped with the group's shared layer metrics.
+        self.is_layered: bool = False
 
         # Horizontal metrics (for uniwidth detection)
         self.advance_widths: Optional[Dict[int, int]] = None
@@ -29,6 +37,8 @@ class FontMeasures:
         self.is_excluded_from_calculations: bool = (
             False  # Excluded from family calculations
         )
+        # Report-only: typo span exceeded the configured letter-height floor
+        self.span_exceeded_target: bool = False
 
         # Clustering results (set during clustering refinement)
         self.cluster_id: Optional[int] = None

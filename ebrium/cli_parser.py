@@ -12,7 +12,6 @@ This version has one subcommand per branch:
   ebrium individual  [options] PATH...   -- each font normalized alone
   ebrium family      [options] PATH...   -- group by family, optional --no-cluster
   ebrium superfamily [options] PATH...   -- merge shared-prefix families
-  ebrium springy     [options] PATH...   -- experimental soft-span peer plan
   ebrium probe       [options] PATH...   -- read-only line-box and clipping report
                                              (was --probe-variation-metrics;
                                              it never touched grouping,
@@ -68,10 +67,10 @@ DOCS_URL = "https://www.andrewsipe.com/Ebrium/"
 FORMATS_LINE = "TTF, OTF, WOFF, WOFF2 (.ttx with --use-ttx)"
 
 ASSUME_TYPES = {
-    "script": "treat as a script/handwriting face",
-    "decorative": "treat as a decorative/display face",
-    "unicase": "treat as unicase (no separate cap-height row)",
-    "uniwidth": "treat as fixed-advance-width across the family (one match flags the whole family)",
+    "script": "inherit the family's line box; clipping box grows around the swashes",
+    "decorative": "effect cut (Shadow, Extrude, and similar): inherit the line box, don't set the floor",
+    "unicase": "same line box, less headroom above the letters so it aligns with the text cut",
+    "uniwidth": "label the family as fixed-width across weights (does not change the line box)",
 }
 
 
@@ -91,11 +90,10 @@ def _assume_value(raw: str) -> tuple[str, str]:
 
 
 MODE_SUMMARY = {
-    "individual": "normalize each font on its own; no grouping or clustering",
-    "family": "group by family name; cluster within each family (add --no-cluster to skip clustering)",
-    "superfamily": "merge families sharing a name prefix; cluster across the superfamily",
-    "springy": "experimental: solo spring → peer median → soft pull toward 130% UPM (shared typo)",
-    "probe": "read-only metrics tables: geometry, stored metrics, family pull, and variable-font slider facts",
+    "individual": "one line box per file; no family grouping",
+    "family": "one shared line box per family (optical sizes split; effect cuts inherit)",
+    "superfamily": "merge shared-prefix families, then the same shared line box",
+    "probe": "read-only: cap, x-height, stored metrics, and how far a family run would move each file",
 }
 
 # Coupled to inline tables under "line box (typo / hhea)" and "detection
@@ -103,13 +101,13 @@ MODE_SUMMARY = {
 # assume these print immediately after those groups. If a table moves to the
 # footer, update the matching help.
 LINE_BOX_MODES = {
-    "auto": "each font keeps its own planned typo/hhea values (default)",
-    "force-baseline": "unify typo/hhea across the family using its largest-span style "
-    "(macOS/UI centering follows typo/hhea)",
-    "force-baseline-main-cluster": "like force-baseline, but the reference is chosen "
-    "only from the family's largest optical cluster",
-    "safe-hhea": "average existing typo/hhea values across the family and apply them "
-    "uniformly (Win uses max ranges)",
+    "auto": "shared line box from cap height, centered, at least the letter-height floor (default). "
+    "Effect and script cuts inherit it. Mixed optical sizes each get their own box",
+    "force-baseline": "after that plan, copy one style's line box onto the whole family "
+    "(the largest span, unless --line-box-from names the file)",
+    "force-baseline-main-cluster": "like force-baseline, but the copied style is chosen "
+    "only from the core cluster, not from effect or script cuts",
+    "safe-hhea": "ignore the measured plan and average the typo/hhea values already stored in the files",
 }
 
 EXIT_CODES = {
@@ -173,8 +171,8 @@ def _add_preview_args(g: Any) -> None:
 def _add_spacing_args(g: Any, *, include_max_adjustment: bool = True) -> None:
     g.add_argument(
         "-l", "--letter-height", type=float, default=130, metavar="PERCENT",
-        help="target height of the letter span (default: 130); a floor, not a fixed "
-        "value -- auto-adjust may raise it for large x-heights, see --no-auto-adjust",
+        help="minimum letter-span floor as %% of UPM (default: 130); measured "
+        "accented-cap or descender clearance may raise the box above this",
     )
     g.add_argument(
         "-t", "--top-margin", type=float, default=25, metavar="PERCENT",
@@ -188,12 +186,12 @@ def _add_spacing_args(g: Any, *, include_max_adjustment: bool = True) -> None:
         # exposing a flag that silently does nothing.
         g.add_argument(
             "--max-adjustment", type=float, default=None, metavar="PERCENT",
-            help="cap how far family extremes may pull a font (default: no cap); "
-            "fonts over the cap are calculated individually",
+            help="cap how far a style may be pulled into the shared line box (default: no cap); "
+        "a style over the cap is planned on its own",
         )
     g.add_argument(
         "--no-auto-adjust", action="store_true",
-        help="use exactly --letter-height (skip the x-height adjustment)",
+        help=argparse.SUPPRESS,
     )
 
 
@@ -272,7 +270,7 @@ def _build_individual(subparsers: Any) -> None:
         "individual",
         usage="%(prog)s [options] [PATH ...]",
         allow_abbrev=False,
-        description="Normalize each font's own vertical metrics -- no grouping, no clustering.",
+        description="Normalize each font on its own. Same centered line box, but nothing is shared with another file.",
         add_help=False,
     )
     # Group *creation* order is display order (argparse), independent of when
@@ -317,7 +315,7 @@ def _build_family(subparsers: Any) -> None:
         "family",
         usage="%(prog)s [options] [PATH ...]",
         allow_abbrev=False,
-        description="Normalize vertical metrics within families, clustering optically similar styles together.",
+        description="Normalize vertical metrics within a family. Core styles share one centered line box. Effect and script cuts inherit it. Optical sizes in the same family each get their own box.",
         add_help=False,
     )
     # Non-metrics groups (sorting/analysis) first, ordered by how often they
@@ -326,7 +324,7 @@ def _build_family(subparsers: Any) -> None:
     g_in = p.add_argument_group("input")
     g_run = p.add_argument_group("preview and confirmation")
     g_mod = p.add_argument_group("grouping modifiers (repeatable)")
-    g_cluster = p.add_argument_group("clustering")
+    g_cluster = p.add_argument_group("plan")
     g_det = p.add_argument_group("detection overrides (filename globs, repeatable)")
     g_space = p.add_argument_group("vertical spacing (% of UPM)")
     g_box = p.add_argument_group("line box (typo / hhea)")
@@ -336,20 +334,20 @@ def _build_family(subparsers: Any) -> None:
         ("ebrium family fonts/ -r", "normalize a tree by family (asks before writing)"),
         ("ebrium family fonts/ -r -n", "preview the changes"),
         ("ebrium family fonts/ -r -y", "skip the confirmation prompt"),
-        ("ebrium family fonts/ --no-cluster", "skip clustering (unpredictable / mis-detected metrics)"),
+        ("ebrium family fonts/ --no-cluster", "line box from outline extremes instead of the shared plan"),
         ("ebrium family fonts/ --ignore-term Adobe", "drop a shared word before grouping"),
-        ('ebrium family fonts/ --merge "A,B"', "merge two families before clustering"),
-        ("ebrium family fonts/ --line-box force-baseline", "unify the typo/hhea line box"),
-        ("ebrium family fonts/ --line-box-from Bold.ttf", "pin the line-box reference font"),
+        ('ebrium family fonts/ --merge "A,B"', "merge two families into one line box"),
+        ("ebrium family fonts/ --line-box-from Bold.ttf", "copy that file's line box onto the family"),
     ]
     notes = [
         CHECKPOINT_NOTE,
         COMBINE_NOTE,
-        "--merge and --ignore-term still apply with --no-cluster; clustering is what's skipped.",
-        "--line-box-from pins an explicit reference font; it wins over "
-        "--line-box force-baseline-main-cluster when both would pick one.",
-        "--line-box force-baseline (and force-baseline-main-cluster) skip single-font "
-        "families (e.g. a lone 'Name Variable'); pair them with --merge.",
+        "--merge and --ignore-term still apply with --no-cluster; --no-cluster replaces the shared plan with outline extremes.",
+        "--line-box auto (the default) already shares one centered line box. "
+        "force-baseline copies one style's box onto the family instead.",
+        "--line-box-from names that style; it wins over force-baseline-main-cluster.",
+        "force-baseline skips a family of one file. Pair it with --merge when the "
+        "reference lives in another family name.",
     ]
 
     _add_help(
@@ -374,9 +372,8 @@ def _build_family(subparsers: Any) -> None:
     _add_grouping_mod_args(p, g_mod)
     g_cluster.add_argument(
         "--no-cluster", action="store_true",
-        help="skip clustering; use bbox extremes for every font in the family "
-        "(default is to cluster; for unpredictable metrics that get "
-        "incorrectly detected). Formerly --safe-max.",
+        help="use outline extremes for the line box instead of the shared cap-centered plan "
+        "(for metrics the measured plan gets wrong). Formerly --safe-max.",
     )
     p.add_argument("--safe-max", action="store_true", dest="no_cluster", help=argparse.SUPPRESS)
     _add_detection_args(p, g_det)
@@ -390,7 +387,7 @@ def _build_superfamily(subparsers: Any) -> None:
         "superfamily",
         usage="%(prog)s [options] [PATH ...]",
         allow_abbrev=False,
-        description="Merge families sharing a name prefix and cluster optically similar styles across the merge.",
+        description="Merge families that share a name prefix, then give them one centered line box. Optical sizes split. Effect and script cuts inherit.",
         add_help=False,
     )
     # Same ordering logic as _build_family: non-metrics (sorting/analysis)
@@ -404,21 +401,20 @@ def _build_superfamily(subparsers: Any) -> None:
     g_gen = p.add_argument_group("general")
 
     examples = [
-        ("ebrium superfamily fonts/ -r", "merge shared-prefix families into one group"),
+        ("ebrium superfamily fonts/ -r", "merge shared-prefix families into one line box"),
         ("ebrium superfamily fonts/ --exclude Mono", "keep a family out of the merge"),
         ("ebrium superfamily fonts/ --ignore-term Adobe", "drop a shared word before grouping"),
-        ('ebrium superfamily fonts/ --merge "A,B"', "merge two families before the prefix merge"),
-        ("ebrium superfamily fonts/ --line-box force-baseline", "unify the typo/hhea line box"),
+        ('ebrium superfamily fonts/ --merge "A,B"', "merge two families that do not share a prefix"),
     ]
     notes = [
         CHECKPOINT_NOTE,
         COMBINE_NOTE,
         "--exclude keeps a family out of the superfamily merge; --merge still "
         "merges named families first.",
-        "--line-box-from pins an explicit reference font; it wins over "
-        "--line-box force-baseline-main-cluster when both would pick one.",
-        "--line-box force-baseline (and force-baseline-main-cluster) skip single-font "
-        "families (e.g. a lone 'Name Variable'); pair them with --merge.",
+        "Caption, Display, Subhead, and Small Text in the merge each keep their own line box.",
+        "--line-box auto (the default) already shares one centered line box. "
+        "force-baseline copies one style's box onto the group instead.",
+        "--line-box-from names that style; it wins over force-baseline-main-cluster.",
     ]
 
     _add_help(
@@ -448,88 +444,6 @@ def _build_superfamily(subparsers: Any) -> None:
     _add_detection_args(p, g_det)
     _add_spacing_args(g_space)
     _add_line_box_args(g_box)
-    _add_general_args(g_gen, "verbose output; -vv for debug output")
-
-
-def _build_springy(subparsers: Any) -> None:
-    p = subparsers.add_parser(
-        "springy",
-        usage="%(prog)s [options] [PATH ...]",
-        allow_abbrev=False,
-        description=(
-            "Experimental soft-span plan: each style springs solo toward ~130% UPM "
-            "(x-height may nudge the attractor), the peer median is blended toward "
-            "that attractor, and the group shares one typo box. Win uses outline "
-            "extremes. Script/decorative faces inherit typo and do not pull the median."
-        ),
-        add_help=False,
-    )
-    g_in = p.add_argument_group("input")
-    g_run = p.add_argument_group("preview and confirmation")
-    g_peer = p.add_argument_group("peer set")
-    g_mod = p.add_argument_group("grouping modifiers (repeatable)")
-    g_spring = p.add_argument_group("spring")
-    g_det = p.add_argument_group("detection overrides (filename globs, repeatable)")
-    g_space = p.add_argument_group("vertical spacing (% of UPM)")
-    g_gen = p.add_argument_group("general")
-
-    examples = [
-        ("ebrium springy fonts/ -r", "springy plan by family name"),
-        ("ebrium springy fonts/ -r --superfamily", "merge shared-prefix families (VF + statics)"),
-        ("ebrium springy fonts/ -r -n", "preview without writing"),
-        ("ebrium springy fonts/ -r --blend 40", "40% pull toward the 130% attractor (default)"),
-        ("ebrium springy fonts/ -r --blend 0", "use the solo-median span only (no attractor pull)"),
-    ]
-    notes = [
-        CHECKPOINT_NOTE,
-        COMBINE_NOTE,
-        "Default peer set is family name. Use --superfamily when a variable font "
-        "and its extracted statics should share one box (e.g. Register + Register Variable).",
-        "--blend is the weight toward the letter-height attractor (default 40). "
-        "0 keeps the median of solo springs; 100 snaps to the attractor.",
-    ]
-
-    _add_help(
-        g_gen,
-        panel=safety_panel(message=PANEL_MESSAGE, rows=PANEL_ROWS_BASIC),
-        inline={
-            "detection overrides (filename globs, repeatable)": choices_section(
-                "--assume types", ASSUME_TYPES
-            ),
-        },
-        footer=[
-            examples_section(examples),
-            notes_section(notes),
-            exit_status_section(EXIT_CODES),
-            line_section("formats", FORMATS_LINE),
-            docs_section(DOCS_URL),
-        ],
-    )
-    _add_input_args(g_in)
-    _add_preview_args(g_run)
-    g_peer.add_argument(
-        "--superfamily",
-        action="store_true",
-        help="merge families that share a name prefix into one peer set "
-        "(default groups by family name only)",
-    )
-    _add_grouping_mod_args(p, g_mod)
-    # --exclude only meaningful with prefix merge
-    g_mod.add_argument(
-        "--exclude",
-        action="append",
-        metavar="FAMILY",
-        help="with --superfamily, keep FAMILY out of the prefix merge",
-    )
-    g_spring.add_argument(
-        "--blend",
-        type=float,
-        default=40.0,
-        metavar="PCT",
-        help="percent weight toward the letter-height attractor (default: 40)",
-    )
-    _add_detection_args(p, g_det)
-    _add_spacing_args(g_space, include_max_adjustment=False)
     _add_general_args(g_gen, "verbose output; -vv for debug output")
 
 
@@ -591,13 +505,12 @@ def _build_probe(subparsers: Any) -> None:
     )
     _add_input_args(g_in)
 
-
 # ---------------------------------------------------------------- top level
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog=PROG,
-        usage="%(prog)s {individual,family,superfamily,springy,probe} [options] [PATH ...]",
+        usage="%(prog)s {individual,family,superfamily,probe} [options] [PATH ...]",
         allow_abbrev=False,
         description=(
             "Normalize vertical metrics across fonts without changing unitsPerEm "
@@ -627,7 +540,6 @@ def build_parser() -> argparse.ArgumentParser:
     _build_individual(subparsers)
     _build_family(subparsers)
     _build_superfamily(subparsers)
-    _build_springy(subparsers)
     _build_probe(subparsers)
     return p
 
@@ -642,13 +554,7 @@ def finalize_args(args: argparse.Namespace) -> None:
     """
     mode = args.mode
 
-    # springy: peer set is family or superfamily; planning uses grouping_mode "springy"
-    args.springy = mode == "springy"
-    if mode == "springy":
-        peer = "superfamily" if getattr(args, "superfamily", False) else "family"
-        args.grouping_mode = peer
-        args.plan_mode = "springy"
-    elif mode == "individual":
+    if mode == "individual":
         args.grouping_mode = "individual"
         args.plan_mode = "individual"
     elif mode == "family":
@@ -697,9 +603,5 @@ def finalize_args(args: argparse.Namespace) -> None:
     args.assume_unicase = buckets["unicase"] or None
     args.assume_uniwidth = buckets["uniwidth"] or None
 
-    if not hasattr(args, "blend"):
-        args.blend = 40.0
-    if not hasattr(args, "springy"):
-        args.springy = False
     if not hasattr(args, "plan_mode"):
         args.plan_mode = getattr(args, "grouping_mode", None)

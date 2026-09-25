@@ -1,5 +1,7 @@
 """Optical clustering logic for grouping similar fonts."""
 
+import re
+from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 from . import config
@@ -7,6 +9,27 @@ from . import models
 
 MetricsConfig = config.MetricsConfig
 FontMeasures = models.FontMeasures
+
+# Plain cut vs effect dress. Used only when a family actually contains a Face
+# style — otherwise these tokens are ignored (no false splits).
+_FACE_TOKEN = "face"
+_EFFECT_TOKENS = frozenset(
+    {
+        "coarse",
+        "extrude",
+        "fill",
+        "fine",
+        "halftone",
+        "inline",
+        "lines",
+        "outline",
+        "reverse",
+        "rough",
+        "shade",
+        "shaded",
+        "shadow",
+    }
+)
 
 
 def compute_optical_similarity(
@@ -262,6 +285,65 @@ def detect_script_font(
     return False
 
 
+def _name_tokens(fm: FontMeasures) -> List[str]:
+    """Split a filename stem into lowercase tokens (hyphens and CamelCase)."""
+    stem = Path(fm.path).stem
+    tokens: List[str] = []
+    for part in re.split(r"[-_ ]+", stem):
+        tokens.extend(
+            re.findall(r"[A-Z]+(?=[A-Z][a-z])|[A-Z]?[a-z]+|[A-Z]+|\d+", part)
+        )
+    return [t.lower() for t in tokens if t]
+
+
+def _is_face_cut(fm: FontMeasures) -> bool:
+    return _FACE_TOKEN in _name_tokens(fm)
+
+
+def _is_effect_cut(fm: FontMeasures) -> bool:
+    return bool(_EFFECT_TOKENS.intersection(_name_tokens(fm)))
+
+
+def peel_effect_outliers(
+    group: List[FontMeasures],
+) -> Tuple[List[FontMeasures], List[FontMeasures]]:
+    """Split Face cores from effect cuts, and honor ``--assume decorative``.
+
+    When the group contains a Face style, effect-token styles inherit typo
+    instead of joining the optical cluster (Rig Shadow/Extrude/Fine, etc.).
+    ``--assume decorative`` peels a style the same way even without a Face
+    token, unless that style is itself a Face cut.
+
+    Returns (remaining, decorative_outliers). Remaining is never emptied
+    solely by this split — if nothing would be left to plan, the group is
+    returned unchanged.
+    """
+    if len(group) < 2:
+        return group, []
+
+    has_face = any(_is_face_cut(fm) for fm in group)
+    remaining: List[FontMeasures] = []
+    peeled: List[FontMeasures] = []
+
+    for fm in group:
+        face = _is_face_cut(fm)
+        assumed = bool(fm.is_decorative_candidate) and not face
+        effect = has_face and _is_effect_cut(fm) and not face
+        if assumed or effect:
+            fm.is_decorative_outlier = True
+            fm.is_decorative_candidate = False
+            peeled.append(fm)
+        else:
+            remaining.append(fm)
+
+    if not remaining:
+        for fm in peeled:
+            fm.is_decorative_outlier = False
+        return group, []
+
+    return remaining, peeled
+
+
 def cluster_group_helper(
     group: List[FontMeasures],
     threshold: float,
@@ -273,6 +355,10 @@ def cluster_group_helper(
     """
     if len(group) <= 1:
         return ([group] if group else [], [], [])
+
+    group, peeled_effects = peel_effect_outliers(group)
+    if len(group) <= 1:
+        return ([group] if group else [], peeled_effects, [])
 
     # Build similarity graph based on cap height + x-height + descender
     n = len(group)
@@ -354,7 +440,7 @@ def cluster_group_helper(
     # True outliers become single-font clusters
     all_clusters = core_clusters + [[fm] for fm in true_outliers]
 
-    return (all_clusters, decorative_outliers, script_outliers)
+    return (all_clusters, decorative_outliers + peeled_effects, script_outliers)
 
 
 def detect_optical_clusters(
@@ -370,6 +456,13 @@ def detect_optical_clusters(
     """
     if len(measures) <= 1:
         return ([measures] if measures else [], [], [])
+
+    # Effect cuts (Shadow, Fine, Inline, …) must leave before unicase detection.
+    # Their distorted cap height can look like x-height ≈ cap, which would
+    # mislabel them unicase instead of decorative outliers inheriting Face typo.
+    measures, peeled_effects = peel_effect_outliers(measures)
+    if len(measures) <= 1:
+        return ([measures] if measures else [], peeled_effects, [])
 
     # Separate unicase and non-unicase fonts
     unicase_fonts = [fm for fm in measures if fm.is_unicase]
@@ -388,7 +481,7 @@ def detect_optical_clusters(
             fm.is_decorative_outlier = True
 
         # Add unicase to decorative outliers list
-        all_decorative = decorative + unicase_fonts
+        all_decorative = decorative + unicase_fonts + peeled_effects
 
         return (clusters, all_decorative, scripts)
 
@@ -397,11 +490,11 @@ def detect_optical_clusters(
         clusters, decorative, scripts = cluster_group_helper(
             unicase_fonts, threshold, config
         )
-        return (clusters, decorative, scripts)
+        return (clusters, decorative + peeled_effects, scripts)
 
     # If no unicase fonts, cluster normally
     else:
         clusters, decorative, scripts = cluster_group_helper(
             non_unicase_fonts, threshold, config
         )
-        return (clusters, decorative, scripts)
+        return (clusters, decorative + peeled_effects, scripts)

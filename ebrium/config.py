@@ -65,6 +65,49 @@ UPPERCASE_CAPHEIGHT_SAMPLES: Tuple[int, ...] = (
     0x0054,  # T
 )
 
+# Accented capitals used as a hard typo-ascender clearance floor (GF-style).
+# If none of these exist in the font, planning estimates and flags a re-check.
+ACCENTED_CAP_CODEPOINTS: Tuple[int, ...] = (
+    0x00C0,  # À
+    0x00C1,  # Á
+    0x00C2,  # Â
+    0x00C3,  # Ã
+    0x00C4,  # Ä
+    0x00C5,  # Å
+    0x00C8,  # È
+    0x00C9,  # É
+    0x00CA,  # Ê
+    0x00CB,  # Ë
+    0x00CC,  # Ì
+    0x00CD,  # Í
+    0x00CE,  # Î
+    0x00CF,  # Ï
+    0x00D2,  # Ò
+    0x00D3,  # Ó
+    0x00D4,  # Ô
+    0x00D5,  # Õ
+    0x00D6,  # Ö
+    0x00D9,  # Ù
+    0x00DA,  # Ú
+    0x00DB,  # Û
+    0x00DC,  # Ü
+    0x00DD,  # Ý
+    0x0102,  # Ă
+    0x01CD,  # Ǎ
+    0x1EA0,  # Ạ
+    0x1EA2,  # Ả
+    0x1EA4,  # Ấ
+    0x1EA6,  # Ầ
+    0x1EA8,  # Ẩ
+    0x1EAA,  # Ẫ
+    0x1EAC,  # Ậ
+    0x1EAE,  # Ắ
+    0x1EB0,  # Ằ
+    0x1EB2,  # Ẳ
+    0x1EB4,  # Ẵ
+    0x1EB6,  # Ặ
+)
+
 
 @dataclass
 class MetricsConfig:
@@ -73,8 +116,6 @@ class MetricsConfig:
     # Internal representation: all stored as fractions (convert from percentage input)
     target_span: float = 1.3  # Internal: as multiplier (1.3x = 130% of UPM)
     win_buffer: float = 0.02  # Internal: as fraction (0.02 = 2%)
-    xheight_softener: float = 0.6
-    adapt_for_xheight: bool = True
     optical_threshold: float = (
         0.025  # 2.5% UPM for identical detection (validated optimal)
     )
@@ -99,9 +140,8 @@ class MetricsConfig:
     script_win_buffer_multiplier: float = (
         1.5  # Buffer multiplier for script fonts (1.5x default)
     )
-    auto_adjust_target: bool = (
-        True  # Enable automatic target adjustment based on x-height
-    )
+    # Kept for CLI --no-auto-adjust compatibility; x-height no longer raises the span floor.
+    auto_adjust_target: bool = False
     # Unify typo line box across a family for UI centering issues (mixed width masters)
     force_baseline: bool = False
     # Prefer reference master from largest optical cluster only (omit height/width extremes)
@@ -112,5 +152,3 @@ class MetricsConfig:
     uniwidth_consistency_threshold: float = (
         0.90  # 90% of sampled glyphs must have identical advance widths
     )
-    # Springy plan: weight toward the 1300 attractor (0 = keep solo median, 1 = snap to attractor)
-    springy_blend: float = 0.4

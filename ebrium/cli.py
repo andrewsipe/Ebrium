@@ -97,8 +97,6 @@ def main() -> None:
     config = MetricsConfig(
         target_span=(args.letter_height / 100.0) if args.letter_height > 0 else 1.3,
         win_buffer=0.02,
-        xheight_softener=0.6,
-        adapt_for_xheight=True,
         optical_threshold=0.025,  # Validated optimal threshold (2.5% UPM)
         top_margin=(args.top_margin / 100.0) if args.top_margin >= 0 else 0.25,
         max_adjustment=(args.max_adjustment / 100.0) if args.max_adjustment else None,
@@ -113,7 +111,6 @@ def main() -> None:
         force_baseline_from_pattern=(
             (getattr(args, "force_baseline_from", None) or "").strip() or None
         ),
-        springy_blend=(getattr(args, "blend", 40.0) or 0.0) / 100.0,
     )
 
     files = scan_fonts(args.paths or ["."], args.recursive, args.use_ttx)

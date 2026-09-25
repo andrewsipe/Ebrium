@@ -4,11 +4,11 @@ The numbers are the default individual plan for this geometry (UPM 1000):
 
 - cap 700, x-height 480, ascenders 750, descender -180, bbox -180..750
 - typo ascender starts at cap + 25% UPM = 950 (the 750 ascenders do not override)
-- centering descender is -(950 - 700) = -250, which is already deeper than -180
-- x/cap ≈ 0.686 keeps the letter-height floor at 130% and adds a small
-  x-height bump, so the span floor is 1315
-- span 1200 is short by 115; the 60/40 split yields typo 1019 / -296
-- Win follows the bbox, then is raised to cover typo: 1019 / 296
+- centering descender is -(950 - 700) = -250
+- letter-height floor is 130% (1300); expand while staying centered:
+  asc = (1300 + 700) / 2 = 1000, desc = -300
+- no accented-capital samples → missing flagged (report-only); floors unchanged
+- Win follows the bbox, then is raised to cover typo: 1000 / 300
 - line gaps are 0; USE_TYPO_METRICS is set; outlines and UPM stay put
 
 A second font is the same outlines plus an fvar axis and sentinel MVAR/HVAR
@@ -30,7 +30,7 @@ from fontTools.ttLib.tables._f_v_a_r import Axis, table__f_v_a_r
 from ebrium.application import apply_metrics
 from ebrium.config import MetricsConfig
 from ebrium.measurements import measure_fonts
-from ebrium.planning import build_plans
+from ebrium.planning import build_plans, plan_typo_box
 
 MVAR_SENTINEL = b"EBRIUM-MVAR-FIXTURE"
 HVAR_SENTINEL = b"EBRIUM-HVAR-FIXTURE"
@@ -120,9 +120,10 @@ class PlanningFixtureTest(unittest.TestCase):
 
             self.assertEqual(
                 (fm.target_typo_asc, fm.target_typo_desc),
-                (1019, -296),
+                (1000, -300),
             )
-            self.assertEqual((fm.target_win_asc, fm.target_win_desc), (1019, 296))
+            self.assertEqual((fm.target_win_asc, fm.target_win_desc), (1000, 300))
+            self.assertTrue(fm.accented_cap_missing)
 
             font = TTFont(str(path))
             os2 = font["OS/2"]
@@ -131,10 +132,10 @@ class PlanningFixtureTest(unittest.TestCase):
             self.assertEqual(font["glyf"]["H"].yMax, 700)
             self.assertEqual(
                 (os2.sTypoAscender, os2.sTypoDescender, os2.sTypoLineGap),
-                (1019, -296, 0),
+                (1000, -300, 0),
             )
-            self.assertEqual((os2.usWinAscent, os2.usWinDescent), (1019, 296))
-            self.assertEqual((hhea.ascent, hhea.descent, hhea.lineGap), (1019, -296, 0))
+            self.assertEqual((os2.usWinAscent, os2.usWinDescent), (1000, 300))
+            self.assertEqual((hhea.ascent, hhea.descent, hhea.lineGap), (1000, -300, 0))
             self.assertTrue(os2.fsSelection & (1 << 7))
             self.assertEqual(os2.sCapHeight, 700)
             self.assertEqual(os2.sxHeight, 480)
@@ -156,7 +157,7 @@ class PlanningFixtureTest(unittest.TestCase):
             axis = font["fvar"].axes[0]
             self.assertEqual(
                 (os2.sTypoAscender, os2.sTypoDescender, os2.sTypoLineGap),
-                (1019, -296, 0),
+                (1000, -300, 0),
             )
             self.assertEqual(font["glyf"]["H"].yMax, 700)
             self.assertEqual(
@@ -164,6 +165,32 @@ class PlanningFixtureTest(unittest.TestCase):
                 ("wght", 400, 400, 700),
             )
             font.close()
+
+    def test_plan_typo_box_centers_then_applies_floors(self) -> None:
+        asc, desc, exceeded = plan_typo_box(
+            upm=1000,
+            cap=700,
+            typo_asc_seed=950,
+            descender_min=-180,
+            accented_cap_max=None,
+            accented_cap_missing=True,
+            target_span_norm=1.3,
+        )
+        self.assertEqual((asc, desc), (1000, -300))
+        self.assertFalse(exceeded)
+
+        asc, desc, exceeded = plan_typo_box(
+            upm=1000,
+            cap=700,
+            typo_asc_seed=950,
+            descender_min=-400,
+            accented_cap_max=1100,
+            accented_cap_missing=False,
+            target_span_norm=1.3,
+        )
+        self.assertEqual(asc, 1100)
+        self.assertEqual(desc, -400)
+        self.assertTrue(exceeded)
 
 
 if __name__ == "__main__":

@@ -33,15 +33,15 @@
     <ol class="steps">
       <li>
         <span class="term">Measure</span>
-        Cap height (optical), x-height, ascenders, descenders, glyph bounds — normalized by each font’s UPM so mixed masters compare fairly.
+        Cap height, x-height, ascenders, descenders, the tallest accented capital, and glyph bounds — normalized by each font’s UPM.
       </li>
       <li>
-        <span class="term">Cluster</span>
-        Optically identical styles share a core plan. Outliers (decorative / script span, mis-detected metrics) can sit outside the main cluster. Skipped entirely under <code>individual</code> and under <code>family --no-cluster</code>.
+        <span class="term">Separate</span>
+        Core styles set the line box. Effect and script cuts inherit it. A peer group that mixes Caption, Display, Subhead, or Small Text is split into one box per size. A layered or color stack is stamped with one shared box. Skipped under <code>individual</code>. <code>--no-cluster</code> uses outline extremes instead.
       </li>
       <li>
         <span class="term">Plan</span>
-        Build typo/hhea for the core cluster; set Win from family extremes; optionally unify the line box (<code>--line-box</code>); apply letter-height / top-margin floors and <code>--max-adjustment</code> caps. The shape of that plan — matching typo and hhea, a zero line gap, Win as the taller clipping box — follows the Google Fonts vertical metrics pattern. The 130% floor and the 25% headroom are ebrium’s formula in place of tuning the box by eye. See <a href="concepts.html">Concepts</a>.
+        Center capitals in the line box, grow to the letter-height floor while staying centered, then raise a side only when a measured accent or descender needs it. Win is the outline extremes plus 2%. The matching typo and hhea, a zero line gap, and Win as the clipping box follow the Google Fonts pattern. See <a href="concepts.html">Concepts</a>.
       </li>
       <li>
         <span class="term">Apply</span>
@@ -52,23 +52,23 @@
     <h2>Grouping strategies</h2>
     <table>
       <thead>
-        <tr><th>Subcommand</th><th>Grouping</th><th>Clustering</th></tr>
+        <tr><th>Subcommand</th><th>Grouping</th><th>Line box</th></tr>
       </thead>
       <tbody>
         <tr>
           <td><code>individual</code></td>
           <td>None — one font at a time</td>
-          <td>No</td>
+          <td>One file; nothing shared</td>
         </tr>
         <tr>
           <td><code>family</code></td>
           <td>By family name</td>
-          <td>Yes (default); off with <code>--no-cluster</code></td>
+          <td>Shared centered box; <code>--no-cluster</code> uses outline extremes</td>
         </tr>
         <tr>
           <td><code>superfamily</code></td>
           <td>Merge families sharing a name prefix</td>
-          <td>Yes, across the merge</td>
+          <td>Same box across the merge; optical sizes still split</td>
         </tr>
         <tr>
           <td><code>probe</code></td>
@@ -79,16 +79,16 @@
     </table>
 
     <h2>Line box modes</h2>
-    <p>Under <code>family</code> / <code>superfamily</code>, <code>--line-box</code> controls typo/hhea unification (Win still uses max ranges where that mode says so):</p>
+    <p>The default, <code>auto</code>, is already one centered line box. The other modes replace that plan:</p>
     <table>
       <thead>
         <tr><th>Mode</th><th>Behavior</th></tr>
       </thead>
       <tbody>
-        <tr><td><code>auto</code></td><td>Each font keeps its own planned typo/hhea (default)</td></tr>
-        <tr><td><code>force-baseline</code></td><td>Unify using the family’s largest-span style</td></tr>
-        <tr><td><code>force-baseline-main-cluster</code></td><td>Same, but reference comes only from the largest optical cluster</td></tr>
-        <tr><td><code>safe-hhea</code></td><td>Average existing typo/hhea across the family; apply uniformly</td></tr>
+        <tr><td><code>auto</code></td><td>Shared centered line box (default). Effect and script cuts inherit it</td></tr>
+        <tr><td><code>force-baseline</code></td><td>Copy one style’s line box onto the family (largest span, or the file named by <code>--line-box-from</code>)</td></tr>
+        <tr><td><code>force-baseline-main-cluster</code></td><td>Same, but that style is chosen from the core, not from effect or script cuts</td></tr>
+        <tr><td><code>safe-hhea</code></td><td>Average the typo/hhea values already stored in the files</td></tr>
       </tbody>
     </table>
     <p><code>--line-box-from PATH_OR_GLOB</code> pins the reference font and implies <code>force-baseline</code> if you left the mode at <code>auto</code>. Single-font “families” skip force-baseline (nothing to unify).</p>
