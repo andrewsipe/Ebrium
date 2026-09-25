@@ -33,7 +33,7 @@
     </p>
 
     <h2>Default</h2>
-    <p>Fits a half-width terminal. Cap height and x-height are measured from the outlines. Shift is how far a family run would move the stored ascender. <code>0%</code> means that run would leave it. <code>No cluster</code> is the same measurement for <code>family --no-cluster</code>. <code>--superfamily</code> shows only the clustered pull. <code>-v</code> restores the shorter names (<code>UPM</code>, <code>Cap</code>, <code>xHt</code>, <code>Pull</code>) and the unit counts.</p>
+    <p>Fits a half-width terminal. Cap height and x-height are measured from the outlines. Shift is how far a family run would move the stored ascender. <code>0%</code> means that run would leave it. <code>-v</code> restores the shorter names (<code>UPM</code>, <code>Cap</code>, <code>xHt</code>, <code>Pull</code>) and the unit counts.</p>
     <div class="report-sample" aria-label="Default probe table"><span class="hi">Sans — 3 fonts — driver Sans-Black.ttf</span>
 
 File               Cap height  x-height  Shift
@@ -74,7 +74,7 @@ Sans-Bold.ttf      800/-200/0    800/-200/0    820/205     set</div>
         <tr>
           <td><code>Shift</code> (default), <code>Pull</code> (<code>-v</code>)</td>
           <td>family pull</td>
-          <td>How far the ascender stored in the file would move if that plan were applied. <code>0%</code> means the file already matches. <code>Shift</code> is a normal family run. <code>No cluster</code> is <code>family --no-cluster</code>. The default shows a percent and an arrow. <code>-v</code> adds the unit count.</td>
+          <td>How far the ascender stored in the file would move if a family run were applied. <code>0%</code> means the file already matches. The default shows a percent and an arrow. <code>-v</code> adds the unit count.</td>
         </tr>
         <tr>
           <td><code>hhea A/D/L</code><br /><code>hheaA</code> <code>hheaD</code> <code>hheaLG</code></td>
@@ -107,9 +107,8 @@ Sans-Bold.ttf      800/-200/0    800/-200/0    820/205     set</div>
 
     <h2>What to do next</h2>
     <ul>
-      <li><strong>Pulls look fine</strong> — run <code>family</code> with <code>-n</code> first, then <code>-y</code> if you’re ready.</li>
-      <li><strong>One style is dragged hard</strong> — process it with <code>individual</code>, or group it differently.</li>
-      <li><strong>Names grouped wrong</strong> — <code>probe --ignore-term</code>, <code>--merge</code>, or <code>--superfamily</code> / <code>--exclude</code>.</li>
+      <li><strong>Pulls look fine</strong> — run <code>ebrium fonts/ -r -n</code>, then drop <code>-n</code> when you are ready.</li>
+      <li><strong>One style is dragged hard</strong> — that is a review note. <code>--no-cluster</code> gives the family one box from its outline extremes instead.</li>
     </ul>
 
     <div class="callout">

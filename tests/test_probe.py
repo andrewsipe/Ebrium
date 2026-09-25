@@ -172,7 +172,7 @@ class ProbeSurveyTest(unittest.TestCase):
         from ebrium.cli_parser import build_parser
 
         with self.assertRaises(SystemExit) as raised:
-            build_parser().parse_args(["family", "--report"])
+            build_parser().parse_args(["--report"])
         self.assertEqual(raised.exception.code, 2)
 
     def test_clipping_tag_range_counts_as_already_varied(self) -> None:

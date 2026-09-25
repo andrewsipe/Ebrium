@@ -142,7 +142,7 @@ hhea table:
     <h2>The summary line</h2>
     <p><code>Family: Example (2 fonts)</code> is the group that shared a family name. <code>Core cluster: 2 fonts | UPM: 1000</code> means both styles were close enough in cap height to share one box. <code>1000</code> is the em. That number stays 1000.</p>
     <p><code>UPM scaled by ~45.0%</code> is how far the box edges moved, added together, as a percent of the em. The top edge moves 170 units (920 − 750) and the bottom edge moves 280 units (380 − 100). 170 + 280 = 450, and 450 is 45% of 1000. When styles in the group move by different amounts, the printed figure is their average.</p>
-    <p><code>increasing vertical height by 52.9%</code> compares the new box with the old one. The box was 850 units tall (750 + 100) and is now 1300 (920 + 380). 1300 is 52.9% taller than 850. That 1300 is the default letter-height floor: 130% of the em. The line gap is left out of that height.</p>
+    <p><code>increasing vertical height by 52.9%</code> compares the new box with the old one. The box was 850 units tall (750 + 100) and is now 1300 (920 + 380). 1300 is 52.9% taller than 850. That 1300 is the default span floor: 130% of the em. The line gap is left out of that height.</p>
     <p><code>linegap set to 0</code> removes the warm band. Baseline-to-baseline distance is the box plus that gap: 850 + 600 = 1450 before, and 1300 + 0 = 1300 after.</p>
 
     <table>

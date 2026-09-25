@@ -96,7 +96,7 @@
     <p>The default plan follows the <a href="https://googlefonts.github.io/gf-guide/metrics.html">Google Fonts vertical metrics</a> pattern, which <a href="https://writingsystems.info/topics/fonts/line-metrics/">SIL’s line-metrics guide</a> calls the recommended strategy and which <a href="https://glyphsapp.com/learn/vertical-metrics">Glyphs</a> documents as the Google strategy:</p>
     <ul>
       <li>Typo and hhea are the same numbers. That is the line box.</li>
-      <li>Both line gaps are 0. The box itself is the line spacing.</li>
+      <li>Both line gaps are 0 unless you pass <code>--line-gap</code>. The box itself is the line spacing.</li>
       <li><code>USE_TYPO_METRICS</code> is on, so apps use that box instead of the Win values.</li>
       <li>Win is the clipping box. It may be taller than the line box, and it is never shorter than the outlines it has to cover.</li>
       <li>Styles in a family share one line box, so switching weight or italic does not change the line spacing of a paragraph.</li>
@@ -105,14 +105,14 @@
     <p>The box is one set of numbers for the whole family, anchored on cap height. <a href="https://typedrawers.com/discussion/4554/on-vertical-metrics-in-the-context-of-a-biscript-tamil-and-latin-font">John Hudson’s note on Tamil and Latin</a> and the SIL guide both point out that two scripts in one file often want different line spacing, and OpenType still stores a single set. ebrium does not add a second one.</p>
     <p><a href="https://kltf.de/files/FontMetrics-kltf.pdf">Karsten Lücke’s font-metrics notes</a> are the history behind the older rule that the typo span had to equal the em. That rule is no longer in the spec, and the default 130% floor does not follow it.</p>
 
-    <h2>Letter height &amp; top margin</h2>
-    <p><code>--letter-height</code> (default 130% of UPM) is a <strong>floor</strong> for the letter span — measured accented-cap or descender clearance may raise the box above it. <code>--top-margin</code> (default 25%) asks for headroom above capitals; it can be ignored when actual ascenders already clear it.</p>
+    <h2>Span and line gap</h2>
+    <p><code>--span</code> (default 130) is the letter-span floor, as a percent of the em. 120 is tighter, 150 is looser. A measured accent or descender can still raise the box. <code>--line-gap</code> (default 0) adds space between lines, also as a percent of the em. 5 is slightly looser.</p>
 
     <h2>Shared box</h2>
-    <p>A family run gives the core styles one line box. <code>probe</code> shows how far each file’s stored ascender would move to match it. <code>--max-adjustment</code> can cap that pull. <code>individual</code> plans each file alone.</p>
+    <p>A run gives the core styles in a family one line box. <code>probe</code> shows how far each file’s stored ascender would move to match it. <code>--no-cluster</code> replaces that plan with one box from the family’s outline extremes.</p>
 
     <h2 id="assume">Detection labels</h2>
-    <p>Filename or measurement heuristics can mark fonts as script, decorative, unicase, or uniwidth. When a file is missed, force it with <code>-a/--assume TYPE:PATTERN</code>. The pictures use stand-in typefaces so the categories are visible. In the script and decorative pictures, the solid box is the shared line box and the dashed box is the clipping box. <code>--exclude-measuring</code> keeps a font out of the family math without classifying it.</p>
+    <p>The program marks a face as script, an effect cut, unicase, or uniwidth from the outlines and the file name. You do not pass a flag for that. In the pictures, the solid box is the shared line box and the dashed box is the clipping box.</p>
     <div class="modes">
       <article class="mode">
         <p class="meta">script</p>
@@ -124,7 +124,6 @@
           <i class="bl"></i>
         </div>
         <p class="what">The script keeps the family’s line box. The clipping box grows around the swashes, with extra room below.</p>
-        <p class="flag"><code>-a script:"*Script*"</code></p>
       </article>
       <article class="mode">
         <p class="meta">decorative</p>
@@ -136,7 +135,6 @@
           <i class="bl"></i>
         </div>
         <p class="what">Effect cuts such as Shadow, Extrude, and Fine keep the Face line box. The clipping box grows around the extra outline so it does not set the family’s spacing.</p>
-        <p class="flag"><code>-a decorative:"*Shadow*"</code></p>
       </article>
       <article class="mode">
         <p class="meta">unicase</p>
@@ -149,7 +147,6 @@
           </div>
         </div>
         <p class="what">The unicase sits on the text face’s baseline, and its letter height lines up with that face’s x-height. It needs less room above the letters.</p>
-        <p class="flag"><code>-a unicase:"*Unicase*"</code></p>
       </article>
       <article class="mode">
         <p class="meta">uniwidth</p>
@@ -160,13 +157,12 @@
             <span class="w800">Handgloves</span>
           </div>
         </div>
-        <p class="what">The weights already share their widths, so a weight change does not reflow the line. ebrium keeps that, and still gives the family one line box.</p>
-        <p class="flag"><code>-a uniwidth:"*Headline*"</code></p>
+        <p class="what">The weights already share their widths, so a weight change does not reflow the line. The family still gets one line box.</p>
       </article>
     </div>
 
-    <h2>Superfamily</h2>
-    <p>Families whose names share a prefix can be merged into one planning unit (<code>superfamily</code>). Use <code>--exclude</code> to keep a family out of that merge, and <code>--merge</code> / <code>--ignore-term</code> when names don’t group the way you want. Each <code>--merge</code> is one complete group: <code>--merge "A,B"</code> merges A and B, and <code>-m A -m B</code> does not.</p>
+    <h2>Optical sizes</h2>
+    <p>Caption, Display, Subhead, and Small Text each keep their own line box. A variable font stays with its own family name. It is not merged into the statics.</p>
 
     <h2>Checkpoint</h2>
     <div class="callout warn">

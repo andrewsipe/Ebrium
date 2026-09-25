@@ -23,6 +23,7 @@ from . import grouping
 from . import measurements
 from . import models
 from . import planning
+from .optical_size import expand_optical_size_groups
 from . import validation
 
 console = get_console()
@@ -49,9 +50,16 @@ def scan_fonts(paths: Iterable[str], recursive: bool, include_ttx: bool) -> List
 
 
 def parse_args() -> argparse.Namespace:
-    from .cli_parser import build_parser, finalize_args
+    import sys
+    from .cli_parser import build_parser, build_probe_parser, finalize_args
 
-    args = build_parser().parse_args()
+    argv = sys.argv[1:]
+    if argv and argv[0] == "probe":
+        args = build_probe_parser().parse_args(argv[1:])
+        args.mode = "probe"
+    else:
+        args = build_parser().parse_args(argv)
+        args.mode = None
     finalize_args(args)
     return args
 
@@ -69,10 +77,6 @@ def main() -> None:
             sys.exit(1)
         from .probe_report import collect_groups, present
 
-        if getattr(args, "superfamily", False):
-            args.grouping_mode = "superfamily"
-        else:
-            args.grouping_mode = "family"
         groups = collect_groups(files_probe, args)
         if not groups:
             cs.StatusIndicator("error").add_message("No measurable fonts found").emit(console)
@@ -95,22 +99,8 @@ def main() -> None:
 
     # Convert percentage inputs to internal fraction representation
     config = MetricsConfig(
-        target_span=(args.letter_height / 100.0) if args.letter_height > 0 else 1.3,
-        win_buffer=0.02,
-        optical_threshold=0.025,  # Validated optimal threshold (2.5% UPM)
-        top_margin=(args.top_margin / 100.0) if args.top_margin >= 0 else 0.25,
-        max_adjustment=(args.max_adjustment / 100.0) if args.max_adjustment else None,
-        max_span_ratio=args.max_span_ratio,
-        decorative_span_threshold=args.decorative_threshold,
-        unicase_threshold=args.unicase_threshold,
-        auto_adjust_target=not args.no_auto_adjust,
-        force_baseline=getattr(args, "force_baseline", False),
-        force_baseline_main_cluster_only=getattr(
-            args, "force_baseline_main_cluster", False
-        ),
-        force_baseline_from_pattern=(
-            (getattr(args, "force_baseline_from", None) or "").strip() or None
-        ),
+        target_span=(args.span / 100.0) if args.span > 0 else 1.3,
+        line_gap=(args.line_gap / 100.0) if args.line_gap > 0 else 0.0,
     )
 
     files = scan_fonts(args.paths or ["."], args.recursive, args.use_ttx)
@@ -196,21 +186,9 @@ def main() -> None:
                     resp = cs.prompt_confirm(prompt_msg, default=True)
 
                     if resp:
-                        # Use checkpoint for matching files
                         measures = [
                             fm for fm in loaded_measures if fm.path in files_set
                         ]
-                        # Apply exclusion patterns to checkpoint-loaded fonts
-                        if args.exclude_measuring:
-                            import fnmatch
-
-                            for fm in measures:
-                                filename = Path(fm.path).name
-                                for pattern in args.exclude_measuring:
-                                    if fnmatch.fnmatch(filename, pattern):
-                                        fm.is_excluded_from_calculations = True
-                                        break
-                        # Update files list to only measure missing ones
                         files = [f for f in files if f not in checkpoint_files]
 
                         if new_files > 0:
@@ -251,11 +229,8 @@ def main() -> None:
                 script_span_threshold=config.script_span_threshold,
                 script_asymmetry_ratio=config.script_asymmetry_ratio,
                 decorative_span_threshold=config.decorative_span_threshold,
-                assume_script=args.assume_script,
-                assume_decorative=args.assume_decorative,
-                assume_unicase=args.assume_unicase,
-                assume_uniwidth=args.assume_uniwidth,
-                exclude_measuring=args.exclude_measuring,
+                assume_uniwidth=None,
+                exclude_measuring=None,
             )
         except KeyboardInterrupt:
             cs.emit("", console=console)
@@ -280,19 +255,7 @@ def main() -> None:
     save_measurements_checkpoint(measures, checkpoint_path, config=config)
 
     cs.emit("", console=console)
-    # Collect forced groups from --merge (one complete group per flag)
-    forced_groups = []
-    if args.combine:
-        for group_str in args.combine:
-            families = [name.strip() for name in group_str.split(",")]
-            if len(families) < 2:
-                cs.StatusIndicator("warning").add_message(
-                    f'--merge needs at least 2 families in one flag, skipping "{group_str}". '
-                    "Each --merge is its own group: -m A -m B does not merge A with B."
-                ).emit(console)
-                continue
-            forced_groups.append(families)
-    families = group_families(args, measures, forced_groups)
+    families = expand_optical_size_groups(group_families(args, measures, []))
     cs.emit("", console=console)
 
     # Map verbose count to Verbosity enum: 0=BRIEF, 1=VERBOSE, 2+=DEBUG
@@ -315,7 +278,7 @@ def main() -> None:
         measures, checkpoint_path, config=config, clusters=clusters_cache
     )
 
-    any_changes_needed = report_changes(families, family_plans, args, forced_groups)
+    any_changes_needed = report_changes(families, family_plans, args, [])
 
     if not any_changes_needed:
         elapsed = time.time() - start_time

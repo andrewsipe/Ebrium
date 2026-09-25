@@ -115,6 +115,7 @@ class MetricsConfig:
 
     # Internal representation: all stored as fractions (convert from percentage input)
     target_span: float = 1.3  # Internal: as multiplier (1.3x = 130% of UPM)
+    line_gap: float = 0.0  # Extra gap as a fraction of UPM (0 = no added gap)
     win_buffer: float = 0.02  # Internal: as fraction (0.02 = 2%)
     optical_threshold: float = (
         0.025  # 2.5% UPM for identical detection (validated optimal)

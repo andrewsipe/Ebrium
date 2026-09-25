@@ -49,6 +49,7 @@ class FontMeasures:
         self.target_typo_desc: Optional[int] = None
         self.target_win_asc: Optional[int] = None
         self.target_win_desc: Optional[int] = None
+        self.target_line_gap: int = 0
 
         # Family context (for status reporting)
         self.family_upm_majority: Optional[int] = None

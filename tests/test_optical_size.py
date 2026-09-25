@@ -5,7 +5,11 @@ from __future__ import annotations
 import unittest
 
 from ebrium.models import FontMeasures
-from ebrium.optical_size import optical_size_label, split_optical_size_groups
+from ebrium.optical_size import (
+    expand_optical_size_groups,
+    optical_size_label,
+    split_optical_size_groups,
+)
 
 
 def _fm(path: str, family: str) -> FontMeasures:
@@ -52,6 +56,16 @@ class OpticalSizeTest(unittest.TestCase):
     def test_small_text_is_not_also_text(self) -> None:
         fm = _fm("/tmp/SourceSerif4SmallText-Regular.otf", "Source Serif 4 Small Text")
         self.assertEqual(optical_size_label(fm), "Small Text")
+
+    def test_expand_names_match_the_planned_boxes(self) -> None:
+        group = [
+            _fm("/tmp/SourceSerif4-Regular.otf", "Source Serif 4"),
+            _fm("/tmp/SourceSerif4Caption-Regular.otf", "Source Serif 4 Caption"),
+        ]
+        expanded = expand_optical_size_groups({"Source Serif 4": group})
+        self.assertEqual(set(expanded), {"Source Serif 4 · Text", "Source Serif 4 · Caption"})
+        self.assertEqual(len(expanded["Source Serif 4 · Text"]), 1)
+        self.assertEqual(len(expanded["Source Serif 4 · Caption"]), 1)
 
 
 if __name__ == "__main__":

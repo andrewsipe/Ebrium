@@ -45,16 +45,17 @@ def apply_metrics(fp: str, fm: FontMeasures, dry_run: bool) -> Tuple[bool, str]:
         win_desc = fm.target_win_desc or old_vals.get("usWinDescent", 0)
         typ_asc = fm.target_typo_asc or old_vals.get("sTypoAscender", 0)
         typ_desc = fm.target_typo_desc or old_vals.get("sTypoDescender", 0)
+        line_gap = int(getattr(fm, "target_line_gap", 0) or 0)
 
         new_vals = {
             "usWinAscent": win_asc,
             "usWinDescent": win_desc,
             "sTypoAscender": typ_asc,
             "sTypoDescender": typ_desc,
-            "sTypoLineGap": 0,
+            "sTypoLineGap": line_gap,
             "hhea.ascent": typ_asc,
             "hhea.descent": typ_desc,
-            "hhea.lineGap": 0,
+            "hhea.lineGap": line_gap,
         }
 
         # Determine changes
@@ -152,7 +153,7 @@ def apply_metrics(fp: str, fm: FontMeasures, dry_run: bool) -> Tuple[bool, str]:
             os2.usWinDescent = int(win_desc)
             os2.sTypoAscender = int(typ_asc)
             os2.sTypoDescender = int(typ_desc)
-            os2.sTypoLineGap = 0
+            os2.sTypoLineGap = line_gap
             try:
                 # Always update sxHeight and sCapHeight with measured values
                 # This ensures OS/2 metadata matches actual glyph measurements
@@ -172,7 +173,7 @@ def apply_metrics(fp: str, fm: FontMeasures, dry_run: bool) -> Tuple[bool, str]:
         if hhea:
             hhea.ascent = int(typ_asc)
             hhea.descent = int(typ_desc)
-            hhea.lineGap = 0
+            hhea.lineGap = line_gap
 
         font.flavor = orig_flavor
         font.save(fp)

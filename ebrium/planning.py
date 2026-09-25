@@ -513,79 +513,31 @@ def maybe_apply_force_family_baseline(
 
     pool: List[FontMeasures] = list(group)
     explicit_pattern = getattr(config, "force_baseline_from_pattern", None)
-    if getattr(config, "force_baseline_main_cluster_only", False) and not (
-        explicit_pattern and explicit_pattern.strip()
-    ):
-        if main_cluster_snapshot:
-            mc_paths = {fm.path for fm in main_cluster_snapshot}
-            narrowed = [fm for fm in group if fm.path in mc_paths]
-            if narrowed:
-                pool = narrowed
-            elif verbosity >= Verbosity.BRIEF:
-                cs.StatusIndicator("warning").add_message(
-                    f"[field]Family:[/field] '{fam}' — "
-                    "[bold]--line-box force-baseline-main-cluster:[/bold] no family fonts "
-                    "matched main cluster snapshot; using full family for reference selection",
-                ).emit(console)
-        elif verbosity >= Verbosity.VERBOSE:
-            cs.StatusIndicator("info").add_message(
-                f"[field]Family:[/field] '{fam}' — "
-                "[dim]--line-box force-baseline-main-cluster:[/dim] no cluster snapshot for "
-                "this family — using full group for reference selection",
-            ).emit(console)
+    if not explicit_pattern or not explicit_pattern.strip():
+        return
+    if getattr(config, "force_baseline_main_cluster_only", False) and main_cluster_snapshot:
+        core_paths = {fm.path for fm in main_cluster_snapshot}
+        pool = [fm for fm in group if fm.path in core_paths]
+    else:
+        pool = list(group)
 
-    best: Optional[FontMeasures] = None
-    best_key: Optional[Tuple[float, float]] = None
-    chosen_explicit = False
-
-    if explicit_pattern and explicit_pattern.strip():
-        raw_matches = _fonts_matching_force_baseline_from(
-            group, explicit_pattern
-        )
-        viable = [
-            fm for fm in raw_matches if _planned_typo_span_norm(fm) is not None
-        ]
-        if len(viable) == 1:
-            best = viable[0]
-            chosen_explicit = True
-        elif len(viable) > 1:
-            viable.sort(key=lambda x: x.path)
-            best = viable[0]
-            chosen_explicit = True
-            cs.StatusIndicator("warning").add_message(
-                f"[field]Family:[/field] '{fam}' — [bold]--line-box-from[/bold] matched "
-                f"{len(viable)} font(s); using {Path(best.path).name} (first by path sort)",
-            ).emit(console)
-        elif raw_matches:
-            cs.StatusIndicator("warning").add_message(
-                f"[field]Family:[/field] '{fam}' — [bold]--line-box-from[/bold] matched "
-                f"{len(raw_matches)} font(s) but none have planned typo targets yet; "
-                "falling back to automatic reference",
-            ).emit(console)
-        else:
-            cs.StatusIndicator("warning").add_message(
-                f"[field]Family:[/field] '{fam}' — [bold]--line-box-from[/bold] "
-                f"{explicit_pattern!r} matched no font in this group; "
-                "falling back to automatic reference",
-            ).emit(console)
-
-    if best is None:
-        candidates = _force_baseline_reference_candidates(pool)
-        for fm in candidates:
-            span_norm = _planned_typo_span_norm(fm)
-            if span_norm is None:
-                continue
-            key = (span_norm, _bbox_span_norm_for_reference(fm))
-            if best_key is None or key > best_key:
-                best_key = key
-                best = fm
-
-    if best is None:
+    raw_matches = _fonts_matching_force_baseline_from(pool, explicit_pattern)
+    viable = [fm for fm in raw_matches if _planned_typo_span_norm(fm) is not None]
+    if not viable:
         cs.StatusIndicator("warning").add_message(
-            f"[field]Family:[/field] '{fam}' — --line-box force-baseline skipped "
-            "(no fonts with planned typo targets)",
+            f"[field]Family:[/field] '{fam}' — --line-box-from {explicit_pattern!r} "
+            "matched no planned font in this group"
+            + (" (core styles only)" if getattr(config, "force_baseline_main_cluster_only", False) else "")
+            + "; keeping the measured plan",
         ).emit(console)
         return
+    viable.sort(key=lambda x: x.path)
+    best = viable[0]
+    if len(viable) > 1 and verbosity >= Verbosity.BRIEF:
+        cs.StatusIndicator("info").add_message(
+            f"[field]Family:[/field] '{fam}' — --line-box-from matched "
+            f"{len(viable)} font(s); using {Path(best.path).name}",
+        ).emit(console)
 
     ref_na = best.target_typo_asc / best.upm  # type: ignore[operator]
     ref_nd = best.target_typo_desc / best.upm  # type: ignore[operator]
@@ -593,23 +545,13 @@ def maybe_apply_force_family_baseline(
 
     indicator = cs.StatusIndicator("info").add_message(
         f"[field]Family:[/field] '{fam}' — "
-        f"[bold]Force baseline:[/bold] unified typo+hhea metrics from "
-        f"{best.path}",
+        f"copying the line box from {Path(best.path).name}",
     ).add_item(
         f"Reference span≈ {ref_span:.4f} UPM (asc ratio {ref_na:.4f}, desc ratio {ref_nd:.4f})",
         indent_level=1,
     )
-    if chosen_explicit:
-        indicator.add_item(
-            "Reference from --line-box-from (not auto largest span)",
-            indent_level=1,
-        )
-    if getattr(config, "force_baseline_main_cluster_only", False) and not chosen_explicit:
-        indicator.add_item(
-            "Reference pool limited to largest optical cluster "
-            "(--line-box force-baseline-main-cluster)",
-            indent_level=1,
-        )
+    if getattr(config, "force_baseline_main_cluster_only", False):
+        indicator.add_item("Reference limited to core styles (--core-only)", indent_level=1)
     if getattr(best, "is_decorative_outlier", False) or getattr(best, "is_script", False):
         indicator.add_item(
             "[warning]Reference is decorative/script—typo line box is copied to the whole family; "
@@ -788,14 +730,15 @@ def analyze_family_impact(
             new_win_asc = fm.target_win_asc or old_win_asc
             new_win_desc = fm.target_win_desc or old_win_desc
             new_span = new_typo_asc + abs(new_typo_desc)
+            new_gap = int(getattr(fm, "target_line_gap", 0) or 0)
 
             if (
                 old_typo_asc != new_typo_asc
                 or old_typo_desc != new_typo_desc
                 or old_win_asc != new_win_asc
                 or old_win_desc != new_win_desc
-                or old_typo_gap != 0
-                or old_hhea_gap != 0
+                or old_typo_gap != new_gap
+                or old_hhea_gap != new_gap
                 or old_hhea_asc != new_typo_asc
                 or old_hhea_desc != new_typo_desc
             ):
@@ -847,6 +790,9 @@ def build_plans(
 
     def _close(name: str, fonts: List[FontMeasures]) -> None:
         stamp_layered_metrics(fonts, config)
+        gap = float(getattr(config, "line_gap", 0.0) or 0.0)
+        for fm in fonts:
+            fm.target_line_gap = int(round(gap * fm.upm)) if fm.upm > 0 else 0
         review[name] = review_notes(fonts)
 
     for fam, group in families.items():
@@ -918,125 +864,6 @@ def build_plans(
                     f"({cs.fmt_count(uni_consistent)}/{cs.fmt_count(uni_total)} glyphs identical) — "
                     f"may contain distinct width classes"
                 ).emit(console)
-
-        # Force-hhea mode: apply averaged hhea/typo values to all fonts
-        if force_hhea:
-            # Filter out excluded fonts for calculations
-            included_fonts = [
-                fm
-                for fm in group
-                if not getattr(fm, "is_excluded_from_calculations", False)
-            ]
-
-            if not included_fonts:
-                # All fonts excluded - fall back to individual calculations
-                cs.StatusIndicator("warning").add_message(
-                    f"[field]Family:[/field] '{fam}' — "
-                    "All fonts excluded from calculations, using individual mode"
-                ).emit(console)
-                for fm in group:
-                    fam_min, fam_max = compute_family_normalized_extremes([fm])
-                    core_asc = compute_family_normalized_ascender([fm], config)
-                    plan_adaptive_metrics(
-                        [fm], fam_min, fam_max, core_asc, config, verbosity
-                    )
-                    finalize_metrics(fm)
-                family_plans[fam] = (
-                    compute_family_normalized_extremes(group)[0],
-                    compute_family_normalized_extremes(group)[1],
-                    compute_family_normalized_ascender(group, config),
-                )
-                continue
-
-            # Compute family extremes for Win values (excluding excluded fonts)
-            fam_min, fam_max = compute_family_normalized_extremes(included_fonts)
-
-            # Read existing hhea/typo values from included fonts and average them
-            # This preserves the original vertical span rather than computing new values
-            norm_typo_asc_list: List[float] = []
-            norm_typo_desc_list: List[float] = []
-
-            for fm in included_fonts:
-                try:
-                    font = _read_ttfont(fm.path)
-                    os2 = font.get("OS/2")
-                    hhea = font.get("hhea")
-
-                    # Prefer hhea values, fallback to OS/2 typo values
-                    if hhea:
-                        typo_asc = int(getattr(hhea, "ascent", 0) or 0)
-                        typo_desc = int(getattr(hhea, "descent", 0) or 0)
-                    elif os2:
-                        typo_asc = int(getattr(os2, "sTypoAscender", 0) or 0)
-                        typo_desc = int(getattr(os2, "sTypoDescender", 0) or 0)
-                    else:
-                        font.close()
-                        continue
-
-                    if typo_asc > 0 and fm.upm > 0:
-                        norm_typo_asc_list.append(typo_asc / fm.upm)
-                    if typo_desc != 0 and fm.upm > 0:
-                        norm_typo_desc_list.append(typo_desc / fm.upm)
-
-                    font.close()
-                except Exception:
-                    continue
-
-            # Compute averages of existing normalized typo values
-            if norm_typo_asc_list and norm_typo_desc_list:
-                avg_norm_typo_asc = sum(norm_typo_asc_list) / len(norm_typo_asc_list)
-                avg_norm_typo_desc = sum(norm_typo_desc_list) / len(norm_typo_desc_list)
-                # Use averaged typo ascender as core_asc for family plan reporting
-                core_asc = avg_norm_typo_asc
-            else:
-                # Fallback: compute from measurements if existing values unavailable
-                core_asc = compute_family_normalized_ascender(included_fonts, config)
-                avg_norm_typo_asc = core_asc
-                # Compute average cap height ratio for descender calculation
-                cap_ratios = [
-                    (fm.cap_optical or fm.cap_height) / fm.upm
-                    for fm in included_fonts
-                    if (fm.cap_optical or fm.cap_height) and fm.upm > 0
-                ]
-                if cap_ratios:
-                    avg_cap_ratio = sum(cap_ratios) / len(cap_ratios)
-                    avg_norm_typo_desc = -(avg_norm_typo_asc - avg_cap_ratio)
-                else:
-                    avg_norm_typo_desc = -0.25  # Default fallback
-
-            # Apply averaged values to ALL fonts in family (including excluded ones)
-            for fm in group:
-                upm = fm.upm
-                # Win metrics use family extremes (excluding excluded fonts)
-                fm.target_win_asc = int(
-                    round(max(fam_max * upm * (1.0 + config.win_buffer), 0))
-                )
-                fm.target_win_desc = int(
-                    round(abs(fam_min * upm) * (1.0 + config.win_buffer))
-                )
-                # Typo metrics use averaged normalized values (scaled to this font's UPM)
-                fm.target_typo_asc = int(round(avg_norm_typo_asc * upm))
-                fm.target_typo_desc = int(round(avg_norm_typo_desc * upm))
-
-                # Ensure Win >= Typo
-                finalize_metrics(fm)
-
-            # Report safe-hhea application
-            if verbosity >= Verbosity.VERBOSE:
-                cs.StatusIndicator("info").add_message(
-                    f"[field]Family:[/field] '{fam}' — "
-                    f"[bold]Safe-hhea mode:[/bold] Applied averaged typo values to all {len(group)} font(s)"
-                ).add_item(
-                    f"Average normalized typo: asc={avg_norm_typo_asc:.4f}, desc={avg_norm_typo_desc:.4f}",
-                    indent_level=1,
-                ).add_item(
-                    f"Based on {len(included_fonts)} included font(s) (excluded: {len(group) - len(included_fonts)})",
-                    indent_level=1,
-                ).emit(console)
-
-            family_plans[fam] = (fam_min, fam_max, core_asc)
-            _close(fam, group)
-            continue
 
         # Handle grouping modes that bypass clustering
         if grouping_mode == "individual":
@@ -1386,63 +1213,6 @@ def build_plans(
                 cluster_msg += f" | {upm_info}"
                 if verbosity >= Verbosity.BRIEF:
                     cs.StatusIndicator("info").add_message(cluster_msg).emit(console)
-
-            # Check if max_adjustment limit should override family normalization
-            fonts_exceeding_limit: List[Tuple[FontMeasures, float]] = []
-            if config.max_adjustment is not None and len(main_cluster) > 1:
-                for fm in main_cluster:
-                    solo_asc = compute_family_normalized_ascender([fm], config)
-                    pull_fraction = (
-                        abs((core_asc - solo_asc) / solo_asc) if solo_asc > 0 else 0
-                    )
-
-                    if pull_fraction > config.max_adjustment:
-                        fonts_exceeding_limit.append(
-                            (fm, pull_fraction * 100)
-                        )  # Store as percent for display
-
-                if fonts_exceeding_limit:
-                    # Report and switch to per-font for affected fonts
-                    for fm, pull_percent in fonts_exceeding_limit:
-                        cs.StatusIndicator("info").add_message(
-                            f"{Path(fm.path).name}: Adjustment {pull_percent:.1f}% exceeds --max-adjustment {config.max_adjustment * 100:.1f}% - using individual calculation"
-                        ).emit(console)
-
-                    # Split main_cluster into two groups
-                    within_limit = [
-                        fm
-                        for fm in main_cluster
-                        if fm not in [f[0] for f in fonts_exceeding_limit]
-                    ]
-                    exceeded_fonts = [f[0] for f in fonts_exceeding_limit]
-
-                    # Update clusters list: replace main_cluster with split clusters
-                    clusters_new = []
-                    for cluster in clusters:
-                        if cluster == main_cluster:
-                            # Replace main_cluster with split clusters
-                            if len(within_limit) > 1:
-                                clusters_new.append(within_limit)
-                            elif within_limit:
-                                # Single font becomes individual cluster
-                                clusters_new.append(within_limit)
-
-                            # Add exceeded fonts as individual clusters
-                            for fm in exceeded_fonts:
-                                clusters_new.append([fm])
-                        else:
-                            clusters_new.append(cluster)
-
-                    clusters = clusters_new
-                    # Update main_cluster reference for decorative outlier handling
-                    # If within_limit is empty (all fonts exceeded), set main_cluster to empty
-                    # so decorative outliers get adaptive metrics instead
-                    if within_limit:
-                        main_cluster = within_limit
-                    else:
-                        # All fonts exceeded - no cluster for decorative outliers to inherit from
-                        main_cluster = []
-                    # Now fall through to normal cluster processing
 
             if decorative_outliers:
                 # Separate unicase from other decorative variants for reporting

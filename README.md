@@ -8,7 +8,7 @@ Formerly **FontMetricsNormalizer**. The public name and CLI are **ebrium**.
 
 Typical pipeline: naming cleanup ([FontNameID](https://github.com/andrewsipe/FontNameID)) → structural tidy ([FontFixer](https://github.com/andrewsipe/FontFixer)) → **ebrium**.
 
-**Docs:** [Line box, reading a run, flags, and report lookup](https://www.andrewsipe.com/Ebrium/) · full flag detail also in `ebrium <subcommand> --help`
+**Docs:** [Line box, reading a run, flags, and probe](https://www.andrewsipe.com/Ebrium/) · `ebrium --help`
 
 ## Install
 
@@ -27,30 +27,20 @@ Tests: `python -m unittest discover -s tests`
 
 ## Quick start
 
-Pick a subcommand — how fonts are grouped — then run. There is no default.
+One command. Fonts are grouped by family name.
 
 ```bash
-# Most common: one centered line box per family
-ebrium family /path/to/fonts -r
+# Default: one centered line box per family
+ebrium /path/to/fonts -r -n
 
-# Preview only
-ebrium family /path/to/fonts -r -n
-
-# Skip confirmation
-ebrium family /path/to/fonts -r -y
+# Outline extremes, so nothing clips
+ebrium /path/to/fonts -r --no-cluster
 
 # Read-only metrics
 ebrium probe /path/to/fonts -r
-
-# Same box, one file at a time
-ebrium individual /path/to/fonts -r
-
-# Merge families that share a name prefix, then one line box
-ebrium superfamily /path/to/fonts -r
-
-# Variable fonts are included at the default instance. Slider facts print under the group.
-# probe does not write fonts. -o writes the table rows.
 ```
+
+Variable fonts are included at the default instance. `probe` does not write fonts. `-o` writes the table rows.
 
 By default, matching fonts are **modified in place** (no backup). Use `-n` first. `probe` only reads.
 

@@ -28,7 +28,7 @@
   <main>
     <p class="meta">Pipeline</p>
     <h1>How it thinks</h1>
-    <p class="lede">The subcommand picks the grouping strategy. Everything after that follows the same four stages.</p>
+    <p class="lede">One command. Fonts are grouped by family name.</p>
 
     <ol class="steps">
       <li>
@@ -37,65 +37,40 @@
       </li>
       <li>
         <span class="term">Separate</span>
-        Core styles set the line box. Effect and script cuts inherit it. A peer group that mixes Caption, Display, Subhead, or Small Text is split into one box per size. A layered or color stack is stamped with one shared box. Skipped under <code>individual</code>. <code>--no-cluster</code> uses outline extremes instead.
+        Core styles set the line box. Effect and script cuts inherit it. Caption, Display, Subhead, and Small Text each get their own box. A layered or color stack copies one box across its files. <code>--no-cluster</code> uses outline extremes instead.
       </li>
       <li>
         <span class="term">Plan</span>
-        Center capitals in the line box, grow to the letter-height floor while staying centered, then raise a side only when a measured accent or descender needs it. Win is the outline extremes plus 2%. The matching typo and hhea, a zero line gap, and Win as the clipping box follow the Google Fonts pattern. See <a href="concepts.html">Concepts</a>.
+        Center capitals in the line box and grow to the span floor (<code>--span</code>, default 130) while staying centered. Raise a side only when a measured accent or descender needs it. The line gap is 0 unless <code>--line-gap</code> says otherwise. Win is the outline extremes plus 2%. See <a href="concepts.html">Concepts</a>.
       </li>
       <li>
         <span class="term">Apply</span>
-        Write metrics in place (unless <code>-n</code>). Enable <a href="https://learn.microsoft.com/en-us/typography/opentype/spec/os2#fsSelection"><code>USE_TYPO_METRICS</code></a> when OS/2 ≥ 4. Zero line gaps. <code>probe</code> does not write.
+        Write metrics in place (unless <code>-n</code>). Enable <a href="https://learn.microsoft.com/en-us/typography/opentype/spec/os2#fsSelection"><code>USE_TYPO_METRICS</code></a> when OS/2 ≥ 4. <code>probe</code> does not write.
       </li>
     </ol>
 
-    <h2>Grouping strategies</h2>
+    <h2>Scope</h2>
     <table>
       <thead>
-        <tr><th>Subcommand</th><th>Grouping</th><th>Line box</th></tr>
+        <tr><th>Scope</th><th>Grouping</th><th>Line box</th></tr>
       </thead>
       <tbody>
         <tr>
-          <td><code>individual</code></td>
-          <td>None — one font at a time</td>
-          <td>One file; nothing shared</td>
-        </tr>
-        <tr>
-          <td><code>family</code></td>
+          <td>family name</td>
           <td>By family name</td>
-          <td>Shared centered box; <code>--no-cluster</code> uses outline extremes</td>
+          <td>Shared centered box. <code>--no-cluster</code> uses outline extremes</td>
         </tr>
         <tr>
-          <td><code>superfamily</code></td>
-          <td>Merge families sharing a name prefix</td>
-          <td>Same box across the merge; optical sizes still split</td>
-        </tr>
-        <tr>
-          <td><code>probe</code></td>
-          <td>—</td>
-          <td>Read-only metrics tables; no write</td>
+          <td><code>ebrium probe</code></td>
+          <td>By family name</td>
+          <td>Read-only. Nothing is written</td>
         </tr>
       </tbody>
     </table>
-
-    <h2>Line box modes</h2>
-    <p>The default, <code>auto</code>, is already one centered line box. The other modes replace that plan:</p>
-    <table>
-      <thead>
-        <tr><th>Mode</th><th>Behavior</th></tr>
-      </thead>
-      <tbody>
-        <tr><td><code>auto</code></td><td>Shared centered line box (default). Effect and script cuts inherit it</td></tr>
-        <tr><td><code>force-baseline</code></td><td>Copy one style’s line box onto the family (largest span, or the file named by <code>--line-box-from</code>)</td></tr>
-        <tr><td><code>force-baseline-main-cluster</code></td><td>Same, but that style is chosen from the core, not from effect or script cuts</td></tr>
-        <tr><td><code>safe-hhea</code></td><td>Average the typo/hhea values already stored in the files</td></tr>
-      </tbody>
-    </table>
-    <p><code>--line-box-from PATH_OR_GLOB</code> pins the reference font and implies <code>force-baseline</code> if you left the mode at <code>auto</code>. Single-font “families” skip force-baseline (nothing to unify).</p>
 
     <h2>Variable fonts</h2>
     <div class="callout warn">
-      <strong>Default instance only.</strong> <code>family</code>, <code>individual</code>, and <code>superfamily</code> read and write the default instance the same way they treat a static font. They do not rewrite <a href="https://learn.microsoft.com/en-us/typography/opentype/spec/mvar">MVAR</a> or <a href="https://learn.microsoft.com/en-us/typography/opentype/spec/hvar">HVAR</a>. <code>probe</code> reads that same default instance and does not write.
+      <strong>Default instance only.</strong> A normal run reads and writes the default instance the same way it treats a static font. It does not rewrite <a href="https://learn.microsoft.com/en-us/typography/opentype/spec/mvar">MVAR</a> or <a href="https://learn.microsoft.com/en-us/typography/opentype/spec/hvar">HVAR</a>. <code>probe</code> reads that same default instance and does not write.
     </div>
 
     <h2>What stays untouched</h2>

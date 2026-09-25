@@ -38,16 +38,15 @@
     </div>
 
     <pre><code>pipx install "git+https://github.com/andrewsipe/ebrium.git"
-ebrium family /path/to/fonts -r -n</code></pre>
+ebrium fonts/ -r -n</code></pre>
 
-    <p>Pick a subcommand first — that choice is how fonts are grouped, and it decides which flags exist:</p>
+    <p>One command groups by family name.</p>
     <ul>
-      <li><code>family</code> — one shared centered line box per family. Optical sizes split. Effect and script cuts inherit</li>
-      <li><code>individual</code> — the same box, per file, with nothing shared</li>
-      <li><code>superfamily</code> — merge families that share a name prefix, then one line box (optical sizes still split)</li>
-      <li><code>probe</code> — read-only metrics, grouped by family: cap, x-height, stored hhea / typo / Win</li>
+      <li><code>ebrium fonts/ -r -n</code> — one centered line box per family</li>
+      <li><code>--no-cluster</code> — the same family, one box from the outline extremes so nothing clips</li>
+      <li><code>ebrium probe</code> — read-only</li>
     </ul>
-    <p>Variable fonts: <code>family</code>, <code>individual</code>, and <code>superfamily</code> rewrite the default instance only and leave <a href="https://learn.microsoft.com/en-us/typography/opentype/spec/mvar">MVAR</a> and <a href="https://learn.microsoft.com/en-us/typography/opentype/spec/hvar">HVAR</a> alone. <code>probe</code> reads that default instance along with every static font and does not write.</p>
+    <p>A run rewrites a variable font's default instance only and leaves <a href="https://learn.microsoft.com/en-us/typography/opentype/spec/mvar">MVAR</a> and <a href="https://learn.microsoft.com/en-us/typography/opentype/spec/hvar">HVAR</a> alone. <code>probe</code> reads that default instance and does not write.</p>
 
     <div class="card-grid">
       <a class="card" href="concepts.html">

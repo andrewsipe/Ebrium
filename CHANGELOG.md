@@ -2,63 +2,31 @@
 
 ## Unreleased
 
-### Removed
-- `ebrium springy` subcommand and `ebrium/springy.py`. The soft-span /
-  x-height-attract path is gone; use `family` / `superfamily` / `individual`.
-
-### Added
-- Families that include a Face cut now treat effect styles (Shadow, Extrude,
-  Outline, Fine, Inline, and similar) as decorative outliers: they inherit
-  the Face typo box and do not set the floor. `--assume decorative` peels a
-  style the same way even when the name has no Face token.
-- A peer group that mixes optical-size names (Caption, Display, Subhead,
-  Small Text, Text, and similar) is unpinned into one line box per size.
-  A single size stays one pinned box. Effect cuts are not optical sizes.
-- A multi-file layered or color set (every file has a color table, or every
-  name is a layer) gets one shared typo box and one shared Win box from the
-  union of the outlines.
-- After planning, a Review block lists only the families that need a look:
-  layered copy, missing accent samples, a span past the letter-height floor,
-  cross-weight spread of cap, x-height, or accent height, and an
-  x-height/cap-height ratio outside 0.65–0.78. Those notes do not change the plan.
+The command groups by family name and writes one centered line box.
+`ebrium probe` reads metrics and does not write.
 
 ### Changed
-- Line box: capitals stay centered when growing to the letter-height floor
-  (`asc − cap = |desc|`). The old 60/40 expand split is removed. Asymmetry
-  comes only from measured floors (accented capitals, real descenders).
-- X-height no longer raises the letter-height floor (that belongs in CSS
-  leading, not font metrics).
-- Accented-capital yMax is a hard typo-ascender floor. If no sample glyphs
-  exist, the run flags a re-check (report-only).
-- `--safe-max` is now `--no-cluster`. It skips clustering under `family`;
-  the old flag still works and is hidden from `--help`.
-- `--combine` / `-c` is now `--merge` / `-m`. Each flag is still one complete
-  group (`--merge "A,B"`). `-m A -m B` does not merge A with B and warns.
-  The old spelling still works and is hidden from `--help`.
-- Parser helpers no longer annotate argparse's private `_ArgumentGroup` and
-  `_SubParsersAction` types.
-- `probe` now reports whether the typo line box already moves, and whether
-  a flat Win clipping box is overflowed at an axis pole past the default
-  ink. The run ends with a tally. HVAR is no longer part of the report.
-- `probe` is the read-only metrics tool. It groups by family (or
-  `--superfamily`), prints one table per group with the driver first and
-  pull from least to most, and lists slider facts for variable fonts.
-  `--report` is removed from `family` and `superfamily`.
-- `probe -q` shows the current filename and a progress bar, then the tally.
-  `probe -o FILE` writes a tab-separated row per font as the run goes.
-  A relative file is saved at the top of the directory that was probed.
+- Capitals stay centered. If the box is under the span floor it grows
+  while staying centered. A measured accent or descender can raise one
+  side past that floor. The old 60/40 split and the x-height span bump
+  are gone.
+- Effect cuts (Shadow, Extrude, Fine, and similar) inherit the family's
+  box. Optical sizes named Caption, Display, Subhead, or Small Text each
+  keep their own. A layered or color set copies one box across its files.
+- A Review block lists only what is worth a look. It does not change the plan.
+
+### Removed
+- `springy`, and the grouping commands `individual`, `family`, and
+  `superfamily`. There is one command.
+- The specialist flags: `--assume`, `--merge`, `--ignore-term`,
+  `--exclude`, `--measure-only`, `--line-box`, `--line-box-from`,
+  `--letter-height`, `--top-margin`, and `--max-adjustment`.
 
 ### Added
-- Static docs site under `docs/` for GitHub Pages (concepts, how it thinks,
-  flag reference, reading a run, `--report` lookup). README slimmed to install
-  + quick start with a Docs link; `project.urls.Documentation` and CLI
-  `DOCS_URL` point at https://www.andrewsipe.com/Ebrium/
-- Docs now say that `family`, `individual`, and `superfamily` rewrite a
-  variable font's default instance only and leave MVAR/HVAR alone. `probe`
-  is the read-only coverage check.
-- Fixture tests: one TTF through measure, plan, and write, plus a variable
-  font whose MVAR/HVAR bytes stay put. Parser tests cover `--no-cluster` /
-  `--merge` and the hidden old spellings.
+- `--span` sets the letter-span floor as a percent of the em (default 130).
+- `--line-gap` adds space between lines as a percent of the em (default 0).
+- `--no-cluster` skips the centered plan and sets one box from the
+  family's outline extremes so nothing clips. Formerly `--safe-max`.
 
 ## [3.2.2] - 2026-09-21
 

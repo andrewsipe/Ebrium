@@ -1,55 +1,41 @@
-"""Flag names the help shows, and the old spellings that stay hidden."""
+"""Family grouping is the only path. --no-cluster is the outline-extremes plan."""
 
 from __future__ import annotations
 
-import argparse
 import unittest
 
 from ebrium.cli_parser import build_parser, finalize_args
 
 
-def _subcommand(name: str) -> argparse.ArgumentParser:
-    parser = build_parser()
-    subparsers = next(action for action in parser._actions if action.dest == "mode")
-    return subparsers.choices[name]
-
-
-def _by_option(parser: argparse.ArgumentParser) -> dict:
-    found = {}
-    for action in parser._actions:
-        for option in action.option_strings:
-            found[option] = action
-    return found
-
-
 class ParserTest(unittest.TestCase):
-    def test_family_shows_new_flags_and_hides_old_spellings(self) -> None:
-        options = _by_option(_subcommand("family"))
-        self.assertIsNot(options["--no-cluster"].help, argparse.SUPPRESS)
-        self.assertIs(options["--safe-max"].help, argparse.SUPPRESS)
-        self.assertEqual(options["--safe-max"].dest, "no_cluster")
-        self.assertIsNot(options["--merge"].help, argparse.SUPPRESS)
-        self.assertIs(options["--combine"].help, argparse.SUPPRESS)
-        self.assertEqual(options["--merge"].dest, "combine")
-        self.assertEqual(options["--combine"].dest, "combine")
+    def test_default_is_family(self) -> None:
+        args = build_parser().parse_args(["fonts/"])
+        finalize_args(args)
+        self.assertEqual(args.grouping_mode, "family")
+        self.assertEqual(args.plan_mode, "family")
 
-    def test_old_spellings_still_set_the_same_mode(self) -> None:
-        args = build_parser().parse_args(
-            ["family", "--safe-max", "-m", "A,B", "-c", "C,D", "-m", "E"]
-        )
+    def test_no_cluster_uses_outline_extremes(self) -> None:
+        args = build_parser().parse_args(["--no-cluster", "fonts/"])
         finalize_args(args)
         self.assertEqual(args.grouping_mode, "conservative")
-        self.assertEqual(args.combine, ["A,B", "C,D", "E"])
+        self.assertEqual(args.plan_mode, "conservative")
 
-        visible = build_parser().parse_args(["family", "--no-cluster", "--merge", "A,B"])
-        finalize_args(visible)
-        self.assertEqual(visible.grouping_mode, "conservative")
-        self.assertEqual(visible.combine, ["A,B"])
-
-    def test_individual_rejects_family_only_flags(self) -> None:
-        with self.assertRaises(SystemExit) as raised:
-            build_parser().parse_args(["individual", "--no-cluster"])
-        self.assertEqual(raised.exception.code, 2)
+    def test_span_and_line_gap_defaults(self) -> None:
+        args = build_parser().parse_args(["fonts/"])
+        self.assertEqual(args.span, 130)
+        self.assertEqual(args.line_gap, 0)
+        custom = build_parser().parse_args(["--span", "120", "--line-gap", "5"])
+        self.assertEqual(custom.span, 120)
+        self.assertEqual(custom.line_gap, 5)
+        options = {
+            opt
+            for action in build_parser()._actions
+            for opt in action.option_strings
+        }
+        self.assertNotIn("--scope", options)
+        self.assertIn("--no-cluster", options)
+        with self.assertRaises(SystemExit):
+            build_parser().parse_args(["--scope", "superfamily"])
 
 
 if __name__ == "__main__":

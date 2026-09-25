@@ -28,142 +28,22 @@
   <main class="wide">
     <p class="meta">Reference</p>
     <h1>Flag reference</h1>
-    <p class="lede">Each subcommand only defines flags that do something for it. Invalid combinations are argparse errors, not silent warnings. Live wording: <code>ebrium &lt;subcommand&gt; --help</code>.</p>
+    <p class="lede">There is one plan. These are the ways to run it.</p>
 
-    <h2>Who gets what</h2>
     <table>
-      <thead>
-        <tr>
-          <th>Subcommand</th>
-          <th>Beyond shared input / preview / spacing / detection</th>
-        </tr>
-      </thead>
+      <thead><tr><th></th><th></th></tr></thead>
       <tbody>
-        <tr>
-          <td><code>individual</code></td>
-          <td>Same centered box per file; no <code>--max-adjustment</code></td>
-        </tr>
-        <tr>
-          <td><code>family</code></td>
-          <td><code>--no-cluster</code>, <code>--merge</code>, <code>--ignore-term</code>, <code>--line-box*</code>, <code>--max-adjustment</code></td>
-        </tr>
-        <tr>
-          <td><code>superfamily</code></td>
-          <td>Same as family except <code>--no-cluster</code>; plus <code>--exclude</code></td>
-        </tr>
-        <tr>
-          <td><code>probe</code></td>
-          <td>Read-only metrics tables grouped by family. <code>--superfamily</code>, <code>--merge</code>, <code>--ignore-term</code>, <code>--exclude</code>, <code>-q</code>, <code>-o</code>.</td>
-        </tr>
+        <tr><td><code>ebrium fonts/ -r</code></td><td>One centered line box per family. You confirm before anything is written.</td></tr>
+        <tr><td><code>-n</code></td><td>Preview. Nothing is written.</td></tr>
+        <tr><td><code>-y</code></td><td>Skip the confirmation.</td></tr>
+        <tr><td><code>--span %</code></td><td>Letter-span floor (default 130). Tighter 120, looser 150.</td></tr>
+        <tr><td><code>--line-gap %</code></td><td>Extra space between lines (default 0). 5 is slightly looser.</td></tr>
+        <tr><td><code>--no-cluster</code></td><td>One box from the family's outline extremes, so nothing clips.</td></tr>
+        <tr><td><code>ebrium probe fonts/ -r</code></td><td>Read the metrics. Write nothing.</td></tr>
       </tbody>
     </table>
-    <div class="callout warn">
-      <strong>Variable fonts.</strong> <code>family</code>, <code>individual</code>, and <code>superfamily</code> rewrite the default instance only and leave <a href="https://learn.microsoft.com/en-us/typography/opentype/spec/mvar">MVAR</a> and <a href="https://learn.microsoft.com/en-us/typography/opentype/spec/hvar">HVAR</a> alone. <code>probe</code> records that default instance with the rest of the family and does not write.
-    </div>
+    <p>Effect cuts inherit the family box. Caption, Display, Subhead, and Small Text each keep their own. A review at the end names anything worth a look. The box is 130% of the em at minimum, capitals centered, with room for a real accent or descender.</p>
 
-    <h2>Shared (individual / family / superfamily)</h2>
-    <table>
-      <thead>
-        <tr><th>Flag</th><th>Meaning</th></tr>
-      </thead>
-      <tbody>
-        <tr><td><code>PATH…</code></td><td>Font files or directories (default: current directory)</td></tr>
-        <tr><td><code>-r, --recursive</code></td><td>Recurse into directories</td></tr>
-        <tr><td><code>--use-ttx</code></td><td>Also process <code>.ttx</code> files</td></tr>
-        <tr><td><code>-n, --dry-run</code></td><td>Preview without writing</td></tr>
-        <tr><td><code>-y, --yes</code></td><td>Skip confirmation prompt</td></tr>
-        <tr><td><code>-l, --letter-height %</code></td><td>Letter-span floor (default 130). Measured accent or descender clearance may raise the box above it</td></tr>
-        <tr><td><code>-t, --top-margin %</code></td><td>Headroom above caps (default 25); may be ignored if ascenders already clear it</td></tr>
-        <tr><td><code>-a, --assume TYPE:PATTERN</code></td><td>Force a membership: <code>script</code> and <code>decorative</code> inherit the line box; <code>unicase</code> uses less headroom; <code>uniwidth</code> is a label only</td></tr>
-        <tr><td><code>--exclude-measuring PATTERN</code></td><td>Exclude from family calculations (not a classify flag)</td></tr>
-        <tr><td><code>-v / -vv</code></td><td>On <code>probe</code>, <code>-v</code> adds a compact hhea / typo / Win table. <code>-vv</code> prints one wide table with each of those values in its own column.</td></tr>
-      </tbody>
-    </table>
-
-    <h2>probe only</h2>
-    <table>
-      <thead>
-        <tr><th>Flag</th><th>Meaning</th></tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td><code>-q, --quiet</code></td>
-          <td>Current filename and a progress bar, then a count. The metrics go to <code>-o</code>. Cannot be combined with <code>-v</code>.</td>
-        </tr>
-        <tr>
-          <td><code>-o, --output FILE</code></td>
-          <td>Tab-separated sheet, one row per font. hhea, typo, and Win values are separate columns. A relative file is saved at the top of the directory you probed.</td>
-        </tr>
-        <tr>
-          <td><code>-v</code></td>
-          <td><code>-v</code> adds the compact hhea / typo / Win table. <code>-vv</code> prints one wide table with each value in its own column.</td>
-        </tr>
-      </tbody>
-    </table>
-
-    <h2>family only</h2>
-    <table>
-      <thead>
-        <tr><th>Flag</th><th>Meaning</th></tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td><code>--no-cluster</code></td>
-          <td>Use outline extremes for the line box instead of the shared cap-centered plan. Formerly <code>--safe-max</code>.</td>
-        </tr>
-      </tbody>
-    </table>
-
-    <h2>family and superfamily</h2>
-    <table>
-      <thead>
-        <tr><th>Flag</th><th>Meaning</th></tr>
-      </thead>
-      <tbody>
-        <tr><td><code>--max-adjustment %</code></td><td>Cap how far a style may be pulled into the shared line box</td></tr>
-        <tr>
-          <td><code>-m, --merge "A,B"</code></td>
-          <td>One complete group per flag. Repeat <code>--merge</code> for separate groups. <code>-m A -m B</code> does <strong>not</strong> merge A with B. Formerly <code>-c</code> / <code>--combine</code>.</td>
-        </tr>
-        <tr>
-          <td><code>-i, --ignore-term TERM</code></td>
-          <td>Drop a whole word from family names before grouping (case-sensitive, anywhere; repeatable or comma-separated)</td>
-        </tr>
-        <tr><td><code>-e, --exclude FAMILY</code></td><td><code>superfamily</code> only — keep a family out of the merge</td></tr>
-        <tr>
-          <td><code>-b, --line-box MODE</code></td>
-          <td><code>auto</code> is the shared centered line box. <code>force-baseline</code> copies one style's box onto the family. <code>force-baseline-main-cluster</code> picks that style from the core only. <code>safe-hhea</code> averages the values already stored in the files.</td>
-        </tr>
-        <tr>
-          <td><code>--line-box-from PATH_OR_GLOB</code></td>
-          <td>Name the style whose line box is copied onto the family. Implies <code>force-baseline</code> if the mode is still <code>auto</code></td>
-        </tr>
-      </tbody>
-    </table>
-
-    <div class="callout">
-      <strong>Abbreviation trap.</strong> Parsers set <code>allow_abbrev=False</code>, so <code>--exclude</code> under <code>individual</code> errors instead of silently matching <code>--exclude-measuring</code>.
-    </div>
-
-    <div class="callout">
-      <strong>Exit codes.</strong> <code>0</code> done; <code>1</code> no font files; <code>2</code> no measurable fonts, or bad arguments; <code>3</code> aborted at the prompt. <code>probe</code> only uses 0, 1, and 2.
-    </div>
-
-    <h2>Recipes</h2>
-    <pre><code># Preview family plan
-ebrium family fonts/ -r -n
-
-# Line box from outline extremes
-ebrium family fonts/ -r --no-cluster
-
-# Two families, one line box
-ebrium family fonts/ -r --merge "Display,DisplayAlt"
-
-# Copy the core style's line box onto the family
-ebrium family fonts/ -r -b force-baseline-main-cluster
-
-# Superfamily, leave one family alone
-ebrium superfamily fonts/ -r -e "SpecialSans"</code></pre>
   </main>
 
   <footer class="site-footer">

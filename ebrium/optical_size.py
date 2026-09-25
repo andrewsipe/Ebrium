@@ -74,3 +74,22 @@ def split_optical_size_groups(
         return [("default", group)]
 
     return list(buckets.items())
+
+
+def expand_optical_size_groups(
+    families: dict[str, List[FontMeasures]],
+) -> dict[str, List[FontMeasures]]:
+    """Rename mixed optical-size groups so each planned box has its own key.
+
+    ``build_plans`` reports those names. The change summary looks families up
+    by the same key, so the split has to happen before that lookup.
+    """
+    expanded: dict[str, List[FontMeasures]] = {}
+    for fam, group in families.items():
+        subgroups = split_optical_size_groups(group)
+        if len(subgroups) < 2:
+            expanded[fam] = group
+            continue
+        for label, fonts in subgroups:
+            expanded[f"{fam} · {label}"] = fonts
+    return expanded
