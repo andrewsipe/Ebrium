@@ -1,8 +1,5 @@
 """Application functions for applying metrics to font files."""
 
-import sys
-from typing import Dict, Tuple
-from pathlib import Path
 
 import FontCore.core_console_styles as cs
 from FontCore.core_console_styles import get_console
@@ -13,7 +10,7 @@ console = get_console()
 FontMeasures = models.FontMeasures
 
 
-def apply_metrics(fp: str, fm: FontMeasures, dry_run: bool) -> Tuple[bool, str]:
+def apply_metrics(fp: str, fm: FontMeasures, dry_run: bool) -> tuple[bool, str]:
     """Apply computed metrics to font file."""
     try:
         from fontTools.ttLib import TTFont
@@ -21,8 +18,8 @@ def apply_metrics(fp: str, fm: FontMeasures, dry_run: bool) -> Tuple[bool, str]:
         font = TTFont(fp)
         orig_flavor = getattr(font, "flavor", None)
 
-        old_vals: Dict[str, int] = {}
-        new_vals: Dict[str, int] = {}
+        old_vals: dict[str, int] = {}
+        new_vals: dict[str, int] = {}
 
         os2 = font["OS/2"] if "OS/2" in font else None
         hhea = font["hhea"] if "hhea" in font else None

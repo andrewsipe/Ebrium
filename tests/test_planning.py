@@ -1,9 +1,9 @@
 """One real TTF through measure → plan → write.
 
-The numbers are the default individual plan for this geometry (UPM 1000):
+The numbers are the default family plan for this geometry (UPM 1000):
 
 - cap 700, x-height 480, ascenders 750, descender -180, bbox -180..750
-- typo ascender starts at cap + 25% UPM = 950 (the 750 ascenders do not override)
+- the seed is cap + 25% of the em (950). Lowercase ascenders do not raise it
 - centering descender is -(950 - 700) = -250
 - letter-height floor is 130% (1300); expand while staying centered:
   asc = (1300 + 700) / 2 = 1000, desc = -300
@@ -12,7 +12,7 @@ The numbers are the default individual plan for this geometry (UPM 1000):
 - line gaps are 0; USE_TYPO_METRICS is set; outlines and UPM stay put
 
 A second font is the same outlines plus an fvar axis and sentinel MVAR/HVAR
-bytes. family/individual/superfamily rewrite the default instance only.
+bytes. A family run rewrites the default instance only.
 """
 
 from __future__ import annotations
@@ -105,14 +105,14 @@ def _plan_and_apply(path: Path):
     build_plans(
         {fm.family_name: measures},
         MetricsConfig(),
-        grouping_mode="individual",
+        grouping_mode="family",
     )
     apply_metrics(str(path), fm, dry_run=False)
     return fm
 
 
 class PlanningFixtureTest(unittest.TestCase):
-    def test_individual_run_writes_default_metrics(self) -> None:
+    def test_family_run_writes_default_metrics(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "FixtureSans-Regular.ttf"
             _write_fixture(path, variable=False)

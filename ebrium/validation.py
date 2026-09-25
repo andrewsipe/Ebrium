@@ -60,7 +60,7 @@ def report_changes(families, plans, args, forced_groups) -> bool:
 
     def get_impact_category(fam):
         group = families[fam]
-        avg_typo, avg_span, num_fonts, has_changes = analyze_family_impact(group)
+        avg_typo, _avg_span, _num_fonts, has_changes = analyze_family_impact(group)
         if not has_changes or avg_typo < 0.1:
             return (0, fam)
         elif avg_typo < 2.0:
@@ -72,22 +72,18 @@ def report_changes(families, plans, args, forced_groups) -> bool:
 
     sorted_families = sorted(plans.items(), key=lambda x: get_impact_category(x[0]))
 
-    for fam, (fam_min, fam_max, fam_asc) in sorted_families:
+    for fam, (_fam_min, _fam_max, fam_asc) in sorted_families:
         group = families[fam]
         avg_typo, avg_span, num_fonts, has_changes = analyze_family_impact(group)
 
         family_label = f"[bold]{fam}[/bold]"
         unique_names = set(fm.family_name for fm in group)
-        if len(unique_names) > 1:
-            if args.grouping_mode == "superfamily":
-                family_label += " [darktext.dim](superfamily)[/darktext.dim]"
-            elif forced_groups and any(fam in fg for fg in forced_groups):
-                family_label += " [darktext.dim](forced group)[/darktext.dim]"
+        if len(unique_names) > 1 and forced_groups and any(fam in fg for fg in forced_groups):
+            family_label += " [darktext.dim](matched)[/darktext.dim]"
 
         if any(fm.is_uniwidth for fm in group):
             family_label += " [darktext.dim](uniwidth)[/darktext.dim]"
 
-        # Adjust label for individual mode
         verbose = int(getattr(args, "verbose", 0) or 0)
         style_word = "style" if num_fonts == 1 else "styles"
         if verbose >= 1:

@@ -4,7 +4,8 @@ import argparse
 import sys
 import time
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional
+from typing import Optional
+from collections.abc import Iterable
 
 # Checkout fallback: product root (sibling FontCore/) on path when not installed
 _root = Path(__file__).resolve().parent.parent
@@ -42,7 +43,7 @@ confirm_or_exit = validation.confirm_or_exit
 validate_args = validation.validate_args
 
 
-def scan_fonts(paths: Iterable[str], recursive: bool, include_ttx: bool) -> List[str]:
+def scan_fonts(paths: Iterable[str], recursive: bool, include_ttx: bool) -> list[str]:
     files = collect_font_files(paths, recursive)
     if include_ttx:
         return files
@@ -112,12 +113,12 @@ def main() -> None:
     checkpoint_path = Path(".metrics_checkpoint.json")
 
     # Try to load checkpoint
-    loaded_measures: List[FontMeasures] = []
-    checkpoint_files: List[str] = []
-    cached_clusters: Optional[Dict[str, Dict[str, List[str]]]] = None
+    loaded_measures: list[FontMeasures] = []
+    checkpoint_files: list[str] = []
+    cached_clusters: Optional[dict[str, dict[str, list[str]]]] = None
     if checkpoint_path.exists():
         try:
-            loaded_measures, missing_files, cached_clusters = (
+            loaded_measures, _missing_files, cached_clusters = (
                 load_measurements_checkpoint(
                     checkpoint_path, expected_files=files, config=config
                 )
@@ -228,9 +229,8 @@ def main() -> None:
                 unicase_threshold=config.unicase_threshold,
                 script_span_threshold=config.script_span_threshold,
                 script_asymmetry_ratio=config.script_asymmetry_ratio,
+                exclusion_margin=config.optical_threshold / 2.0,
                 decorative_span_threshold=config.decorative_span_threshold,
-                assume_uniwidth=None,
-                exclude_measuring=None,
             )
         except KeyboardInterrupt:
             cs.emit("", console=console)
@@ -255,7 +255,10 @@ def main() -> None:
     save_measurements_checkpoint(measures, checkpoint_path, config=config)
 
     cs.emit("", console=console)
-    families = expand_optical_size_groups(group_families(args, measures, []))
+    matched = grouping.parse_matched_groups(args)
+    families = expand_optical_size_groups(
+        group_families(args, measures, matched), matched
+    )
     cs.emit("", console=console)
 
     # Map verbose count to Verbosity enum: 0=BRIEF, 1=VERBOSE, 2+=DEBUG
@@ -270,7 +273,6 @@ def main() -> None:
         verbosity=verbosity,
         cached_clusters=cached_clusters,
         grouping_mode=getattr(args, "plan_mode", None) or args.grouping_mode,
-        force_hhea=args.safe_hhea,
     )
 
     # Save checkpoint with cluster information
@@ -278,7 +280,7 @@ def main() -> None:
         measures, checkpoint_path, config=config, clusters=clusters_cache
     )
 
-    any_changes_needed = report_changes(families, family_plans, args, [])
+    any_changes_needed = report_changes(families, family_plans, args, matched)
 
     if not any_changes_needed:
         elapsed = time.time() - start_time

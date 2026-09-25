@@ -67,6 +67,18 @@ class ReviewTest(unittest.TestCase):
         bold = _fm("Text-Bold", cap=706, x=484)
         self.assertEqual(review_notes([regular, bold]), [])
 
+    def test_peel_reports_how_much_the_box_would_move(self) -> None:
+        core = _fm("Text-Regular")
+        core.descender_min = -200
+        peeled = _fm("Text-Shadow")
+        peeled.descender_min = -500
+        peeled.is_decorative_outlier = True
+        notes = review_notes([core, peeled])
+        match = [note for note in notes if "Text-Shadow.ttf left" in note]
+        self.assertEqual(len(match), 1)
+        self.assertIn("decorative", match[0])
+        self.assertNotIn("by 0.0%", match[0])
+
 
 if __name__ == "__main__":
     unittest.main()

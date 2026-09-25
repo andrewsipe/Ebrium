@@ -10,7 +10,8 @@ from __future__ import annotations
 import csv
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence, TextIO, Tuple
+from typing import Optional, TextIO
+from collections.abc import Sequence
 
 import FontCore.core_console_styles as cs
 from FontCore.core_console_styles import get_console
@@ -28,7 +29,6 @@ from .variation_probe import (
     _hang_percent,
     _percent_text,
     _pole_name,
-    explain_survey,
     report_destination,
     survey_font,
 )
@@ -104,7 +104,7 @@ def _clear_targets(group: Sequence[FontMeasures]) -> None:
         fm.target_win_desc = None
 
 
-def _planned_ascenders(group: Sequence[FontMeasures], cfg: MetricsConfig, mode: str) -> Dict[str, Optional[int]]:
+def _planned_ascenders(group: Sequence[FontMeasures], cfg: MetricsConfig, mode: str) -> dict[str, Optional[int]]:
     _clear_targets(group)
     planning.build_plans(
         {mode: list(group)},
@@ -115,7 +115,7 @@ def _planned_ascenders(group: Sequence[FontMeasures], cfg: MetricsConfig, mode: 
     return {fm.path: fm.target_typo_asc for fm in group}
 
 
-def _pull_from(planned: Optional[int], current: Optional[int], upm: int) -> Tuple[Optional[int], Optional[float]]:
+def _pull_from(planned: Optional[int], current: Optional[int], upm: int) -> tuple[Optional[int], Optional[float]]:
     """Change a plan would write, measured from the ascender stored in the file."""
     if planned is None or current is None:
         return None, None
@@ -130,7 +130,7 @@ def order_group(
     cfg: MetricsConfig,
     *,
     no_cluster: bool,
-) -> List[ProbeRow]:
+) -> list[ProbeRow]:
     """Driver first, then the rest from the smallest pull to the largest."""
     stored = {fm.path: read_stored_metrics(fm.path) for fm in group}
     surveys = {}
@@ -145,13 +145,10 @@ def order_group(
         finally:
             font.close()
 
-    mode = "superfamily" if not no_cluster else "family"
-    if len(group) < 2:
-        mode = "individual"
-    clustered = _planned_ascenders(group, cfg, mode)
+    clustered = _planned_ascenders(group, cfg, "family")
     flat = _planned_ascenders(group, cfg, "conservative") if no_cluster else {}
     driver = _driver(group)
-    ranked: List[ProbeRow] = []
+    ranked: list[ProbeRow] = []
     for fm in group:
         current = stored[fm.path].typo_asc if stored[fm.path] else None
         units, percent = _pull_from(clustered.get(fm.path), current, fm.upm)
@@ -210,7 +207,7 @@ def _stored_num(stored: Optional[StoredMetrics], name: str) -> str:
     return str(getattr(stored, name))
 
 
-def slider_lines(survey: Optional[Survey]) -> List[str]:
+def slider_lines(survey: Optional[Survey]) -> list[str]:
     if survey is None or survey.clipping == "static":
         return []
     lines = [" ".join(_axis_sentence(*axis) for axis in survey.axes)]
@@ -233,18 +230,15 @@ def slider_note(survey: Optional[Survey]) -> str:
     return " ".join(slider_lines(survey))
 
 
-def collect_groups(files: Sequence[str], args) -> Dict[str, List[ProbeRow]]:
+def collect_groups(files: Sequence[str], args) -> dict[str, list[ProbeRow]]:
     measures = measurements.measure_fonts(list(files))
     if not measures:
         return {}
-    forced_groups = []
-    for group_str in getattr(args, "combine", None) or []:
-        families = [name.strip() for name in group_str.split(",") if name.strip()]
-        if len(families) >= 2:
-            forced_groups.append(families)
-    families = grouping.group_families(args, measures, forced_groups)
+    families = grouping.group_families(
+        args, measures, grouping.parse_matched_groups(args)
+    )
     cfg = MetricsConfig()
-    no_cluster = getattr(args, "grouping_mode", "family") != "superfamily"
+    no_cluster = True
     return {
         name: order_group(group, cfg, no_cluster=no_cluster)
         for name, group in families.items()
@@ -313,7 +307,7 @@ def _pair(stored: Optional[StoredMetrics], asc: str, desc: str) -> str:
     return f"{getattr(stored, asc)}/{getattr(stored, desc)}"
 
 
-def scan_cells(row: ProbeRow, *, verbose: int, no_cluster: bool) -> List[str]:
+def scan_cells(row: ProbeRow, *, verbose: int, no_cluster: bool) -> list[str]:
     fm = row.measure
     name = _file_label(row)
     shift = _pull_amount(row, verbose=verbose)
@@ -326,7 +320,7 @@ def scan_cells(row: ProbeRow, *, verbose: int, no_cluster: bool) -> List[str]:
     return cells
 
 
-def metric_cells(row: ProbeRow) -> List[str]:
+def metric_cells(row: ProbeRow) -> list[str]:
     stored = row.stored
     return [
         _file_label(row),
@@ -337,7 +331,7 @@ def metric_cells(row: ProbeRow) -> List[str]:
     ]
 
 
-def full_cells(row: ProbeRow) -> List[str]:
+def full_cells(row: ProbeRow) -> list[str]:
     fm = row.measure
     stored = row.stored
     return [
@@ -359,7 +353,7 @@ def full_cells(row: ProbeRow) -> List[str]:
     ]
 
 
-def row_values(group: str, row: ProbeRow) -> List[str]:
+def row_values(group: str, row: ProbeRow) -> list[str]:
     fm = row.measure
     stored = row.stored
     return [
@@ -384,7 +378,7 @@ def row_values(group: str, row: ProbeRow) -> List[str]:
     ]
 
 
-def _print_one_table(title: str, headers: Sequence[str], rows: List[List[str]]) -> None:
+def _print_one_table(title: str, headers: Sequence[str], rows: list[list[str]]) -> None:
     console = get_console()
     table = cs.create_table(title=title)
     if table is None:
@@ -402,7 +396,7 @@ def _print_one_table(title: str, headers: Sequence[str], rows: List[List[str]]) 
     console.print(table)
 
 
-def _print_table(group: str, rows: List[ProbeRow], *, verbose: int) -> None:
+def _print_table(group: str, rows: list[ProbeRow], *, verbose: int) -> None:
     console = get_console()
     driver = next((row for row in rows if row.is_driver), rows[0])
     noun = "font" if verbose >= 1 else "style"
@@ -448,7 +442,7 @@ def _print_table(group: str, rows: List[ProbeRow], *, verbose: int) -> None:
 
 
 def present(
-    groups: Dict[str, List[ProbeRow]],
+    groups: dict[str, list[ProbeRow]],
     *,
     quiet: bool,
     output: Optional[str],

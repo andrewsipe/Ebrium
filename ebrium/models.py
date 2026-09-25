@@ -1,6 +1,6 @@
 """Font measurement data models."""
 
-from typing import Dict, Optional
+from typing import Optional
 
 
 class FontMeasures:
@@ -27,16 +27,13 @@ class FontMeasures:
         self.is_layered: bool = False
 
         # Horizontal metrics (for uniwidth detection)
-        self.advance_widths: Optional[Dict[int, int]] = None
+        self.advance_widths: Optional[dict[int, int]] = None
 
         # Detection flags (set during measurement)
         self.is_unicase: bool = False
         self.is_script: bool = False
         self.is_uniwidth: bool = False
         self.is_decorative_candidate: bool = False  # Standalone detection
-        self.is_excluded_from_calculations: bool = (
-            False  # Excluded from family calculations
-        )
         # Report-only: typo span exceeded the configured letter-height floor
         self.span_exceeded_target: bool = False
 

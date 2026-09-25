@@ -12,7 +12,8 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence
+from typing import Optional
+from collections.abc import Sequence
 
 import FontCore.core_console_styles as cs
 from FontCore.core_console_styles import get_console
@@ -35,11 +36,11 @@ def font_has_color_table(font) -> bool:
     return any(tag in font for tag in _COLOR_TABLES)
 
 
-def _tokens(fm: FontMeasures) -> List[str]:
+def _tokens(fm: FontMeasures) -> list[str]:
     stem = Path(fm.path).stem
     blob = f"{fm.family_name} {stem}"
     parts = re.split(r"[-_ ]+", blob)
-    tokens: List[str] = []
+    tokens: list[str] = []
     for part in parts:
         tokens.extend(
             re.findall(r"[A-Z]+(?=[A-Z][a-z])|[A-Z]?[a-z]+|[A-Z]+|\d+", part)
@@ -93,26 +94,62 @@ def stamp_layered_metrics(group: Sequence[FontMeasures], config: MetricsConfig) 
     return True
 
 
-def _core_fonts(group: Sequence[FontMeasures]) -> List[FontMeasures]:
+def _core_fonts(group: Sequence[FontMeasures]) -> list[FontMeasures]:
     core = [
         fm
         for fm in group
-        if not fm.is_decorative_outlier
-        and not fm.is_script
-        and not fm.is_excluded_from_calculations
+        if not fm.is_decorative_outlier and not fm.is_script
     ]
     return core or list(group)
 
 
-def _spread(values: List[float]) -> Optional[float]:
+def _spread(values: list[float]) -> Optional[float]:
     if len(values) < 2:
         return None
     return max(values) - min(values)
 
 
-def review_notes(group: Sequence[FontMeasures]) -> List[str]:
+def _peel_notes(group: Sequence[FontMeasures], config: MetricsConfig) -> list[str]:
+    """How much a peel changed the shared line box, as a percent of the em."""
+    from .planning import planned_typo_norm
+
+    core = [
+        fm
+        for fm in group
+        if not fm.is_decorative_outlier and not fm.is_script and fm.upm > 0
+    ]
+    peeled = [fm for fm in group if fm.is_decorative_outlier or fm.is_script]
+    if not core or not peeled:
+        return []
+    actual = planned_typo_norm(core, config)
+    if actual is None:
+        return []
+    actual_span = actual[0] + abs(actual[1])
+    notes: list[str] = []
+    for fm in peeled:
+        stayed = planned_typo_norm([*core, fm], config)
+        if stayed is None:
+            continue
+        delta = abs((stayed[0] + abs(stayed[1])) - actual_span)
+        if fm.is_script:
+            kind = "script"
+        elif fm.is_unicase:
+            kind = "unicase"
+        else:
+            kind = "decorative"
+        notes.append(
+            f"{Path(fm.path).name} left the shared box as {kind}. "
+            f"Keeping it in would have changed the line box by {delta * 100:.1f}% of the em."
+        )
+    return notes
+
+
+def review_notes(
+    group: Sequence[FontMeasures], config: Optional[MetricsConfig] = None
+) -> list[str]:
     """Facts to surface. Empty when nothing in this group needs a look."""
-    notes: List[str] = []
+    config = config or MetricsConfig()
+    notes: list[str] = []
     if any(fm.is_layered for fm in group):
         notes.append(
             f"Layered set: one shared typo and Win across {len(group)} file(s)"
@@ -160,10 +197,11 @@ def review_notes(group: Sequence[FontMeasures]) -> List[str]:
                 f"x-height/cap-height is {mid:.2f}, outside {X_CAP_LOW:.2f}–{X_CAP_HIGH:.2f}. "
                 "Cap-centering may not suit this file; consider x-height or a midpoint"
             )
+    notes.extend(_peel_notes(group, config))
     return notes
 
 
-def emit_review(notes_by_family: Dict[str, List[str]]) -> None:
+def emit_review(notes_by_family: dict[str, list[str]]) -> None:
     """Print the accumulated review once, after planning."""
     flagged = {fam: notes for fam, notes in notes_by_family.items() if notes}
     if not flagged:

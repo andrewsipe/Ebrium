@@ -37,7 +37,7 @@
       </li>
       <li>
         <span class="term">Separate</span>
-        Core styles set the line box. Effect and script cuts inherit it. Caption, Display, Subhead, and Small Text each get their own box. A layered or color stack copies one box across its files. <code>--no-cluster</code> uses outline extremes instead.
+        Core styles set the line box. A script is an outline about twice the em and heavier below the baseline; a face that only just crosses that line stays in the core. An effect cut (Shadow, Extrude, Fine, and similar) is recognized from the file name, and only when that family also has a Face. Caption, Display, Subhead, and Small Text each get their own box. A layered or color stack copies one box across its files. <code>--no-cluster</code> skips all of that and uses the outline extremes.
       </li>
       <li>
         <span class="term">Plan</span>
@@ -49,21 +49,21 @@
       </li>
     </ol>
 
-    <h2>Scope</h2>
+    <h2>The two commands</h2>
     <table>
       <thead>
-        <tr><th>Scope</th><th>Grouping</th><th>Line box</th></tr>
+        <tr><th></th><th>Grouping</th><th>What it writes</th></tr>
       </thead>
       <tbody>
         <tr>
-          <td>family name</td>
-          <td>By family name</td>
-          <td>Shared centered box. <code>--no-cluster</code> uses outline extremes</td>
+          <td><code>ebrium</code></td>
+          <td>By family name. <code>--match</code> pairs names that should share a box</td>
+          <td>One centered box. <code>--no-cluster</code> uses outline extremes instead</td>
         </tr>
         <tr>
           <td><code>ebrium probe</code></td>
-          <td>By family name</td>
-          <td>Read-only. Nothing is written</td>
+          <td>By family name, including any <code>--match</code></td>
+          <td>Nothing. It only reports</td>
         </tr>
       </tbody>
     </table>

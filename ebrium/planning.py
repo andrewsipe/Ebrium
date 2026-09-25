@@ -1,9 +1,7 @@
 """Metrics planning functions for computing normalization targets."""
 
-import fnmatch
-import sys
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Optional
 
 import FontCore.core_console_styles as cs
 from FontCore.core_console_styles import get_console
@@ -28,9 +26,9 @@ _read_ttfont = font_io._read_ttfont
 
 
 def detect_uniwidth_family(
-    group: List[FontMeasures],
+    group: list[FontMeasures],
     threshold: float = 0.90,
-) -> Tuple[bool, float, int, int]:
+) -> tuple[bool, float, int, int]:
     """Detect if fonts in a group share identical advance widths (uniwidth).
 
     A uniwidth family maintains identical advance widths per glyph across all
@@ -86,16 +84,13 @@ def detect_uniwidth_family(
 
 
 def compute_family_normalized_extremes(
-    measures: List[FontMeasures],
-) -> Tuple[float, float]:
+    measures: list[FontMeasures],
+) -> tuple[float, float]:
     """Compute family-wide extremes in normalized units (handles mixed UPMs)."""
-    norm_mins: List[float] = []
-    norm_maxs: List[float] = []
+    norm_mins: list[float] = []
+    norm_maxs: list[float] = []
 
     for fm in measures:
-        # Skip fonts excluded from calculations
-        if getattr(fm, "is_excluded_from_calculations", False):
-            continue
         if fm.min_y is None or fm.max_y is None or fm.upm <= 0:
             continue
         norm_mins.append(fm.min_y / fm.upm)
@@ -135,127 +130,42 @@ def compute_descender_for_centering(
     return desired_desc
 
 
-def compute_cluster_baseline_descender(
-    cluster: List[FontMeasures],
-    exclude_decorative: bool = True,
-) -> Optional[float]:
-    """Compute normalized descender for baseline alignment across cluster.
-
-    Uses median of actual descenders in normalized units to maintain
-    consistent baseline across fonts in the cluster. Should be called with
-    main_cluster only (excluding decorative outliers).
-
-    Args:
-        cluster: Cluster of fonts to compute baseline descender for
-            (should be main_cluster, excluding decorative outliers)
-        exclude_decorative: If True, exclude decorative outliers from calculation
-
-    Returns:
-        Normalized descender value (negative float), or None if insufficient data
-    """
-    # Collect normalized descenders from cluster (excluding decorative if requested)
-    norm_descenders: List[float] = []
-    for fm in cluster:
-        if exclude_decorative and getattr(fm, "is_decorative_outlier", False):
-            continue
-        if fm.descender_min and fm.upm > 0:
-            norm_descenders.append(abs(float(fm.descender_min) / float(fm.upm)))
-
-    if not norm_descenders:
-        return None
-
-    # Use median normalized descender for baseline consistency
-    norm_descenders.sort()
-    n = len(norm_descenders)
-    norm_median_desc = (
-        norm_descenders[n // 2]
-        if n % 2 == 1
-        else (norm_descenders[n // 2 - 1] + norm_descenders[n // 2]) / 2.0
-    )
-
-    return -norm_median_desc
-
-
 def compute_cluster_target_percent(
-    cluster: List[FontMeasures],
+    cluster: list[FontMeasures],
     config: MetricsConfig,
 ) -> float:
     """Letter-height floor for the cluster (UPM-relative).
 
     X-height no longer raises this floor — denser text is a CSS leading concern.
-    ``auto_adjust_target`` is retained for CLI compatibility but is a no-op.
     """
     return config.target_span
 
 
 def compute_family_normalized_ascender(
-    measures: List[FontMeasures], config: MetricsConfig
+    measures: list[FontMeasures], config: MetricsConfig
 ) -> float:
-    """Compute family-wide ascender target based on cap height + fixed headroom.
+    """Seed the line box from cap height plus headroom.
 
-    Strategy:
-    1. Start with max cap height + configured headroom (e.g., 25% UPM)
-    2. If any font's actual ascenders exceed this baseline significantly,
-       use the tallest ascender instead (preserves actual geometry)
-    3. Adjust headroom for unicase fonts (less headroom needed)
+    Tall glyphs do not raise this seed. ``plan_typo_box`` raises the box
+    for a measured accented capital or descender, and that is the only
+    place that happens. A unicase family starts with less headroom; the
+    span floor usually absorbs that.
     """
-    cap_ratios: List[float] = []
-    ascender_ratios: List[float] = []
+    cap_ratios: list[float] = []
+    is_unicase_cluster = all(fm.is_unicase for fm in measures) and len(measures) > 0
 
-    # Filter out excluded fonts for calculations
-    included_measures = [
-        fm for fm in measures if not getattr(fm, "is_excluded_from_calculations", False)
-    ]
-
-    # Check if this is a unicase-only cluster (using included fonts only)
-    is_unicase_cluster = (
-        all(fm.is_unicase for fm in included_measures) and len(included_measures) > 0
-    )
-
-    for fm in included_measures:
+    for fm in measures:
         if fm.upm <= 0:
             continue
         cap = fm.cap_optical or fm.cap_height
         if cap:
             cap_ratios.append(cap / fm.upm)
 
-        # Collect ascender measurements (if available)
-        if fm.ascender_max and fm.ascender_max > 0:
-            ascender_ratios.append(fm.ascender_max / fm.upm)
-
     if not cap_ratios:
-        return 0.85  # Default fallback
+        return 0.85
 
-    max_cap_ratio = max(cap_ratios)
-
-    # Adjust top margin for unicase fonts (less margin needed)
     top_margin = config.top_margin * 0.65 if is_unicase_cluster else config.top_margin
-    baseline_ascender = max_cap_ratio + top_margin
-
-    # Check if actual ascenders exceed baseline
-    if ascender_ratios:
-        max_ascender_ratio = max(ascender_ratios)
-
-        # Define "significant excess" using configurable threshold
-        # Default: 50% of top_margin, or minimum 2% UPM (whichever is larger)
-        significant_threshold = max(
-            config.top_margin * config.ascender_override_threshold, 0.02
-        )
-
-        # If ascenders significantly exceed baseline, use actual ascender height
-        # This preserves the font's actual geometry
-        if max_ascender_ratio > (baseline_ascender + significant_threshold):
-            cs.StatusIndicator("info").add_message(
-                f"Ascenders exceed baseline by {((max_ascender_ratio - baseline_ascender) * 100):.1f}% UPM - using actual ascender height"
-            ).emit(console)
-            return max_ascender_ratio
-
-        # If ascenders are close to baseline, use the larger of the two
-        # (prevents descenders from being unnecessarily deep)
-        if max_ascender_ratio > baseline_ascender:
-            return max_ascender_ratio
-
-    return baseline_ascender
+    return max(cap_ratios) + top_margin
 
 
 def plan_typo_box(
@@ -267,16 +177,15 @@ def plan_typo_box(
     accented_cap_max: Optional[int],
     accented_cap_missing: bool,
     target_span_norm: float,
-) -> Tuple[int, int, bool]:
+) -> tuple[int, int, bool]:
     """Build a typo box: center on caps, then apply measured floors.
 
     1. Seed ascender, center descender (rule 9: ``asc − cap == |desc|``).
     2. If span is under the letter-height floor, expand **while staying centered**.
     3. Raise asc to clear accented caps; deepen desc to clear real descenders.
        Asymmetry comes only from those measurements — not a fixed 60/40 split.
-    4. If accented samples are missing, use ``cap + top``-style seed as estimate
-       (caller may already have raised seed via family ascender); flag via
-       ``accented_cap_missing`` on the FontMeasures (report-only).
+    4. If accented samples are missing, keep the cap-plus-headroom seed and
+       flag ``accented_cap_missing`` on the FontMeasures (report-only).
 
     Returns ``(typo_asc, typo_desc, exceeded_target)``.
     """
@@ -312,8 +221,70 @@ def plan_typo_box(
     return typo_asc, desired_desc, exceeded
 
 
+def planned_typo_norm(
+    fonts: list[FontMeasures],
+    config: MetricsConfig,
+    norm_asc: Optional[float] = None,
+) -> Optional[tuple[float, float, bool]]:
+    """Normalized typo ascender, descender, and whether the span exceeded the floor.
+
+    Does not write targets. ``norm_asc`` is the cap-plus-headroom seed; when
+    omitted it is computed from ``fonts``.
+    """
+    if not fonts:
+        return None
+
+    cap_height_ratios: list[float] = []
+    for fm in fonts:
+        cap = fm.cap_optical or fm.cap_height
+        if cap and fm.upm > 0:
+            cap_height_ratios.append(float(cap) / float(fm.upm))
+    if not cap_height_ratios:
+        norm_cap_h = 0.7
+    else:
+        cap_height_ratios.sort()
+        n = len(cap_height_ratios)
+        norm_cap_h = (
+            cap_height_ratios[n // 2]
+            if n % 2 == 1
+            else (cap_height_ratios[n // 2 - 1] + cap_height_ratios[n // 2]) / 2.0
+        )
+
+    accented_norms = [
+        fm.accented_cap_max / fm.upm
+        for fm in fonts
+        if fm.accented_cap_max and fm.upm > 0
+    ]
+    norm_accented = max(accented_norms) if accented_norms else None
+    any_accented_missing = any(fm.accented_cap_missing for fm in fonts)
+    norm_descenders = [
+        float(fm.descender_min) / float(fm.upm)
+        for fm in fonts
+        if fm.descender_min and fm.upm > 0
+    ]
+    norm_desc_floor = min(norm_descenders) if norm_descenders else None
+    if norm_asc is None:
+        norm_asc = compute_family_normalized_ascender(fonts, config)
+
+    scale = 1000
+    typo_asc, typo_desc, exceeded = plan_typo_box(
+        upm=scale,
+        cap=int(round(norm_cap_h * scale)),
+        typo_asc_seed=int(round(norm_asc * scale)),
+        descender_min=(
+            int(round(norm_desc_floor * scale)) if norm_desc_floor is not None else None
+        ),
+        accented_cap_max=(
+            int(round(norm_accented * scale)) if norm_accented is not None else None
+        ),
+        accented_cap_missing=any_accented_missing and norm_accented is None,
+        target_span_norm=compute_cluster_target_percent(fonts, config),
+    )
+    return typo_asc / float(scale), typo_desc / float(scale), exceeded
+
+
 def plan_identical_metrics(
-    cluster: List[FontMeasures],
+    cluster: list[FontMeasures],
     family_norm_min: float,
     family_norm_max: float,
     family_norm_asc: float,
@@ -327,58 +298,14 @@ def plan_identical_metrics(
     if not cluster:
         return
 
-    # Compute shared cap_height ratio (median in normalized units)
-    cap_height_ratios: List[float] = []
-    for fm in cluster:
-        cap = fm.cap_optical or fm.cap_height
-        if cap and fm.upm > 0:
-            cap_height_ratios.append(float(cap) / float(fm.upm))
-
-    if not cap_height_ratios:
-        norm_cap_h = 0.7
-    else:
-        cap_height_ratios.sort()
-        n = len(cap_height_ratios)
-        norm_cap_h = (
-            cap_height_ratios[n // 2]
-            if n % 2 == 1
-            else (cap_height_ratios[n // 2 - 1] + cap_height_ratios[n // 2]) / 2.0
-        )
-
-    # Family-wide measured floors (core shared box)
-    accented_norms = [
-        fm.accented_cap_max / fm.upm
-        for fm in cluster
-        if fm.accented_cap_max and fm.upm > 0
-    ]
-    norm_accented = max(accented_norms) if accented_norms else None
-    any_accented_missing = any(fm.accented_cap_missing for fm in cluster)
-
-    norm_descenders: List[float] = []
-    for fm in cluster:
-        if fm.descender_min and fm.upm > 0:
-            norm_descenders.append(float(fm.descender_min) / float(fm.upm))
-    norm_desc_floor = min(norm_descenders) if norm_descenders else None  # most negative
-
-    cluster_target = compute_cluster_target_percent(cluster, config)
-
-    # Plan once in normalized space using a representative UPM scale (1000)
-    scale = 1000
-    typo_asc, typo_desc, exceeded = plan_typo_box(
-        upm=scale,
-        cap=int(round(norm_cap_h * scale)),
-        typo_asc_seed=int(round(family_norm_asc * scale)),
-        descender_min=(
-            int(round(norm_desc_floor * scale)) if norm_desc_floor is not None else None
-        ),
-        accented_cap_max=(
-            int(round(norm_accented * scale)) if norm_accented is not None else None
-        ),
-        accented_cap_missing=any_accented_missing and norm_accented is None,
-        target_span_norm=cluster_target,
+    planned = planned_typo_norm(cluster, config, norm_asc=family_norm_asc)
+    if planned is None:
+        return
+    norm_typo_asc, norm_desired_desc, exceeded = planned
+    any_accented_missing = any(fm.accented_cap_missing for fm in cluster) and not any(
+        fm.accented_cap_max for fm in cluster if fm.upm > 0
     )
-    norm_typo_asc = typo_asc / float(scale)
-    norm_desired_desc = typo_desc / float(scale)
+    cluster_target = compute_cluster_target_percent(cluster, config)
 
     if verbosity >= Verbosity.BRIEF and exceeded:
         cs.StatusIndicator("info").add_message(
@@ -386,7 +313,7 @@ def plan_identical_metrics(
             f"({(norm_typo_asc + abs(norm_desired_desc)):.3f} > {cluster_target:.3f}) — flagged for review"
         ).emit(console)
 
-    if verbosity >= Verbosity.BRIEF and any_accented_missing and norm_accented is None:
+    if verbosity >= Verbosity.BRIEF and any_accented_missing:
         cs.StatusIndicator("info").add_message(
             "No accented-capital samples found — re-check when extended Latin / Vietnamese is added"
         ).emit(console)
@@ -417,171 +344,10 @@ def finalize_metrics(fm: FontMeasures) -> None:
         fm.target_win_desc = max(fm.target_win_desc, abs(fm.target_typo_desc))
 
 
-def _planned_typo_span_norm(fm: FontMeasures) -> Optional[float]:
-    if (
-        fm.upm <= 0
-        or fm.target_typo_asc is None
-        or fm.target_typo_desc is None
-    ):
-        return None
-    return (fm.target_typo_asc / fm.upm) + abs(fm.target_typo_desc / fm.upm)
-
-
-def _bbox_span_norm_for_reference(fm: FontMeasures) -> float:
-    if fm.max_y is None or fm.min_y is None or fm.upm <= 0:
-        return 0.0
-    return (fm.max_y - fm.min_y) / fm.upm
-
-
-def _fonts_matching_force_baseline_from(
-    group: List[FontMeasures], pattern: str
-) -> List[FontMeasures]:
-    """Match family members to --line-box-from (path, filename, or fnmatch on basename)."""
-    pattern = pattern.strip()
-    if not pattern:
-        return []
-    want_resolved: Optional[Path] = None
-    p_in = Path(pattern)
-    try:
-        if p_in.is_absolute():
-            want_resolved = p_in.resolve()
-        elif "/" in pattern or "\\" in pattern:
-            want_resolved = (Path.cwd() / p_in).resolve()
-    except OSError:
-        want_resolved = None
-
-    matched: List[FontMeasures] = []
-    seen: set[str] = set()
-    for fm in group:
-        if fm.path in seen:
-            continue
-        fp = Path(fm.path)
-        hit = False
-        if want_resolved is not None:
-            try:
-                if fp.resolve() == want_resolved:
-                    hit = True
-            except OSError:
-                pass
-        if not hit and fp.name == pattern:
-            hit = True
-        if not hit and fnmatch.fnmatch(fp.name, pattern):
-            hit = True
-        if hit:
-            matched.append(fm)
-            seen.add(fm.path)
-    return matched
-
-
-def _force_baseline_reference_candidates(group: List[FontMeasures]) -> List[FontMeasures]:
-    """Fonts considered for \"tallest line box\" reference (exclude obvious outliers)."""
-    core: List[FontMeasures] = []
-    for fm in group:
-        if getattr(fm, "is_excluded_from_calculations", False):
-            continue
-        if getattr(fm, "is_decorative_outlier", False) or getattr(fm, "is_script", False):
-            continue
-        core.append(fm)
-    if core:
-        return core
-    non_excl = [
-        fm
-        for fm in group
-        if not getattr(fm, "is_excluded_from_calculations", False)
-    ]
-    if non_excl:
-        return non_excl
-    return list(group)
-
-
-def maybe_apply_force_family_baseline(
-    fam: str,
-    group: List[FontMeasures],
-    config: MetricsConfig,
-    verbosity: Verbosity,
-    grouping_mode: str,
-    force_hhea: bool,
-    main_cluster_snapshot: Optional[List[FontMeasures]] = None,
-) -> None:
-    """Apply identical normalized typo+hhea ascent/descent to all fonts when enabled."""
-    if not getattr(config, "force_baseline", False):
-        return
-    if force_hhea:
-        return
-    if grouping_mode == "individual" or len(group) < 2:
-        return
-
-    pool: List[FontMeasures] = list(group)
-    explicit_pattern = getattr(config, "force_baseline_from_pattern", None)
-    if not explicit_pattern or not explicit_pattern.strip():
-        return
-    if getattr(config, "force_baseline_main_cluster_only", False) and main_cluster_snapshot:
-        core_paths = {fm.path for fm in main_cluster_snapshot}
-        pool = [fm for fm in group if fm.path in core_paths]
-    else:
-        pool = list(group)
-
-    raw_matches = _fonts_matching_force_baseline_from(pool, explicit_pattern)
-    viable = [fm for fm in raw_matches if _planned_typo_span_norm(fm) is not None]
-    if not viable:
-        cs.StatusIndicator("warning").add_message(
-            f"[field]Family:[/field] '{fam}' — --line-box-from {explicit_pattern!r} "
-            "matched no planned font in this group"
-            + (" (core styles only)" if getattr(config, "force_baseline_main_cluster_only", False) else "")
-            + "; keeping the measured plan",
-        ).emit(console)
-        return
-    viable.sort(key=lambda x: x.path)
-    best = viable[0]
-    if len(viable) > 1 and verbosity >= Verbosity.BRIEF:
-        cs.StatusIndicator("info").add_message(
-            f"[field]Family:[/field] '{fam}' — --line-box-from matched "
-            f"{len(viable)} font(s); using {Path(best.path).name}",
-        ).emit(console)
-
-    ref_na = best.target_typo_asc / best.upm  # type: ignore[operator]
-    ref_nd = best.target_typo_desc / best.upm  # type: ignore[operator]
-    ref_span = _planned_typo_span_norm(best) or 0.0
-
-    indicator = cs.StatusIndicator("info").add_message(
-        f"[field]Family:[/field] '{fam}' — "
-        f"copying the line box from {Path(best.path).name}",
-    ).add_item(
-        f"Reference span≈ {ref_span:.4f} UPM (asc ratio {ref_na:.4f}, desc ratio {ref_nd:.4f})",
-        indent_level=1,
-    )
-    if getattr(config, "force_baseline_main_cluster_only", False):
-        indicator.add_item("Reference limited to core styles (--core-only)", indent_level=1)
-    if getattr(best, "is_decorative_outlier", False) or getattr(best, "is_script", False):
-        indicator.add_item(
-            "[warning]Reference is decorative/script—typo line box is copied to the whole family; "
-            "check Win bounds and design intent[/warning]",
-            indent_level=1,
-        )
-    if verbosity >= Verbosity.VERBOSE:
-        indicator.add_item(
-            f"Tie-break bbox span: {_bbox_span_norm_for_reference(best):.4f} UPM",
-            indent_level=1,
-        )
-    indicator.emit(console)
-
-    for fm in group:
-        if fm.upm <= 0:
-            continue
-        typ_asc_i = int(round(ref_na * fm.upm))
-        typ_desc_i = int(round(ref_nd * fm.upm))
-        # Descender ratios are negative integers; deepen to actual glyphs if forced box is too shallow
-        if fm.descender_min is not None:
-            typ_desc_i = min(typ_desc_i, int(fm.descender_min))
-
-        fm.target_typo_asc = typ_asc_i
-        fm.target_typo_desc = typ_desc_i
-        finalize_metrics(fm)
-
 
 def get_cluster_normalized_typo(
-    cluster: List[FontMeasures],
-) -> Tuple[float, float]:
+    cluster: list[FontMeasures],
+) -> tuple[float, float]:
     """Get representative normalized typo metrics from cluster (after all adjustments)."""
     asc_ratios = [
         fm.target_typo_asc / fm.upm
@@ -598,7 +364,7 @@ def get_cluster_normalized_typo(
     return (norm_asc, norm_desc)
 
 
-def plan_safe_metrics(group: List[FontMeasures], config: MetricsConfig) -> None:
+def plan_safe_metrics(group: list[FontMeasures], config: MetricsConfig) -> None:
     """Conservative bbox approach - all fonts get same normalized bounds.
 
     Win and Typo both use family extremes. This guarantees no clipping but
@@ -621,7 +387,7 @@ def plan_safe_metrics(group: List[FontMeasures], config: MetricsConfig) -> None:
         finalize_metrics(fm)
 
 
-def validate_cluster_consistency(cluster: List[FontMeasures]) -> None:
+def validate_cluster_consistency(cluster: list[FontMeasures]) -> None:
     """Validate that cluster fonts have identical normalized typo ratios."""
     if len(cluster) <= 1:
         return
@@ -652,7 +418,7 @@ def validate_cluster_consistency(cluster: List[FontMeasures]) -> None:
 
 
 def plan_adaptive_metrics(
-    cluster: List[FontMeasures],
+    cluster: list[FontMeasures],
     family_norm_min: float,
     family_norm_max: float,
     family_norm_asc: float,
@@ -695,14 +461,14 @@ def plan_adaptive_metrics(
 
 
 def analyze_family_impact(
-    measures: List[FontMeasures],
-) -> Tuple[float, float, int, bool]:
+    measures: list[FontMeasures],
+) -> tuple[float, float, int, bool]:
     """Analyze the impact of planned changes.
 
     Returns: (avg_typo_change_pct, avg_span_change_pct, num_fonts, has_any_changes)
     """
-    typo_changes: List[float] = []
-    span_changes: List[float] = []
+    typo_changes: list[float] = []
+    span_changes: list[float] = []
     has_any_changes = False
 
     for fm in measures:
@@ -768,15 +534,14 @@ def analyze_family_impact(
 
 
 def build_plans(
-    families: Dict[str, List[FontMeasures]],
+    families: dict[str, list[FontMeasures]],
     config: MetricsConfig,
     verbosity: Verbosity = Verbosity.BRIEF,
-    cached_clusters: Optional[Dict[str, Dict[str, List[str]]]] = None,
+    cached_clusters: Optional[dict[str, dict[str, list[str]]]] = None,
     grouping_mode: str = "family",
-    force_hhea: bool = False,
-    review_sink: Optional[Dict[str, List[str]]] = None,
+    review_sink: Optional[dict[str, list[str]]] = None,
     emit_review_report: bool = True,
-) -> Tuple[Dict[str, Tuple[float, float, float]], Dict[str, Dict[str, List[str]]]]:
+) -> tuple[dict[str, tuple[float, float, float]], dict[str, dict[str, list[str]]]]:
     """Build normalization plans with optical clustering.
 
     Returns:
@@ -785,15 +550,15 @@ def build_plans(
         - clusters_cache: Dict mapping family name to cluster assignments
     """
     family_plans = {}
-    clusters_cache: Dict[str, Dict[str, List[str]]] = {}
-    review: Dict[str, List[str]] = review_sink if review_sink is not None else {}
+    clusters_cache: dict[str, dict[str, list[str]]] = {}
+    review: dict[str, list[str]] = review_sink if review_sink is not None else {}
 
-    def _close(name: str, fonts: List[FontMeasures]) -> None:
+    def _close(name: str, fonts: list[FontMeasures]) -> None:
         stamp_layered_metrics(fonts, config)
         gap = float(getattr(config, "line_gap", 0.0) or 0.0)
         for fm in fonts:
             fm.target_line_gap = int(round(gap * fm.upm)) if fm.upm > 0 else 0
-        review[name] = review_notes(fonts)
+        review[name] = review_notes(fonts, config)
 
     for fam, group in families.items():
         subgroups = split_optical_size_groups(group)
@@ -813,7 +578,6 @@ def build_plans(
                 verbosity=verbosity,
                 cached_clusters=cached_clusters,
                 grouping_mode=grouping_mode,
-                force_hhea=force_hhea,
                 review_sink=review,
                 emit_review_report=False,
             )
@@ -821,10 +585,8 @@ def build_plans(
             clusters_cache.update(sub_cache)
             continue
 
-        # Snapshot for --line-box force-baseline-main-cluster (per iteration; clears prior family leak)
-        baseline_mc_snap: Optional[List[FontMeasures]] = None
         # Compute UPM majority for status reporting
-        upm_counts: Dict[int, int] = {}
+        upm_counts: dict[int, int] = {}
         for fm in group:
             upm_counts[fm.upm] = upm_counts.get(fm.upm, 0) + 1
         family_upm_majority = (
@@ -835,16 +597,7 @@ def build_plans(
             fm.family_upm_majority = family_upm_majority
 
         # Uniwidth detection (family-level)
-        forced_uniwidth = any(fm.is_uniwidth for fm in group)
-        if forced_uniwidth:
-            for fm in group:
-                fm.is_uniwidth = True
-            if verbosity >= Verbosity.VERBOSE:
-                cs.StatusIndicator("info").add_message(
-                    f"[field]Family:[/field] '{fam}' — "
-                    f"[bold]Uniwidth (forced):[/bold] {cs.fmt_count(len(group))} font(s)"
-                ).emit(console)
-        elif len(group) >= 2:
+        if len(group) >= 2:
             is_uni, uni_score, uni_consistent, uni_total = detect_uniwidth_family(
                 group, config.uniwidth_consistency_threshold
             )
@@ -865,36 +618,9 @@ def build_plans(
                     f"may contain distinct width classes"
                 ).emit(console)
 
-        # Handle grouping modes that bypass clustering
-        if grouping_mode == "individual":
-            # Individual mode: skip all clustering and family normalization
-            for fm in group:
-                fam_min, fam_max = compute_family_normalized_extremes([fm])
-                core_asc = compute_family_normalized_ascender([fm], config)
-                plan_adaptive_metrics(
-                    [fm], fam_min, fam_max, core_asc, config, verbosity
-                )
-                finalize_metrics(fm)
-            family_plans[fam] = (
-                compute_family_normalized_extremes(group)[0],
-                compute_family_normalized_extremes(group)[1],
-                compute_family_normalized_ascender(group, config),
-            )
-            _close(fam, group)
-            continue
-
         if grouping_mode == "conservative":
-            # Safe-max mode: use bbox extremes for all fonts (prevents clipping)
+            # Outline extremes for the whole family, so nothing clips.
             plan_safe_metrics(group, config)
-            maybe_apply_force_family_baseline(
-                fam,
-                group,
-                config,
-                verbosity,
-                grouping_mode,
-                force_hhea,
-                main_cluster_snapshot=group,
-            )
             family_plans[fam] = (
                 compute_family_normalized_extremes(group)[0],
                 compute_family_normalized_extremes(group)[1],
@@ -931,10 +657,6 @@ def build_plans(
                     f"[bold]Pure unicase family:[/bold] {cs.fmt_count(unicase_count)} font(s) "
                     f"(x-height ≈ cap-height, clustering normally)"
                 ).emit(console)
-
-        # Level 0: Handle grouping modes that bypass clustering
-        # Note: grouping_mode is passed via args, not config
-        # This check will be handled in build_plans() before calling this section
 
         # Level 1: Compute family-wide extremes (in normalized units) - for Win metrics
         fam_min, fam_max = compute_family_normalized_extremes(group)
@@ -1163,7 +885,7 @@ def build_plans(
                     upm_info = f"UPM: {list(upms)[0]}"
                 else:
                     # Mixed UPMs - show normalized impact
-                    upm_counts: Dict[int, int] = {}
+                    upm_counts: dict[int, int] = {}
                     for fm in main_cluster:
                         upm_counts[fm.upm] = upm_counts.get(fm.upm, 0) + 1
 
@@ -1504,7 +1226,6 @@ def build_plans(
             # Level 8: VALIDATE: Check cluster consistency
             if main_cluster and len(main_cluster) > 1:
                 validate_cluster_consistency(main_cluster)
-            baseline_mc_snap = main_cluster
         else:
             # Single font family: compute ascender and use adaptive
             core_asc = compute_family_normalized_ascender(group, config)
@@ -1512,16 +1233,6 @@ def build_plans(
             # Finalize single font
             for fm in group:
                 finalize_metrics(fm)
-
-        maybe_apply_force_family_baseline(
-            fam,
-            group,
-            config,
-            verbosity,
-            grouping_mode,
-            force_hhea,
-            main_cluster_snapshot=baseline_mc_snap,
-        )
 
         family_plans[fam] = (
             fam_min,
@@ -1532,7 +1243,7 @@ def build_plans(
         )
 
         # Store cluster info for checkpoint (if clustering was performed)
-        if len(group) > 1 and grouping_mode not in ("individual", "conservative"):
+        if len(group) > 1 and grouping_mode != "conservative":
             main_cluster = max(clusters, key=len) if clusters else []
             clusters_cache[fam] = {
                 "main_cluster": [fm.path for fm in main_cluster]

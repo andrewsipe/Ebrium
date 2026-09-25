@@ -31,7 +31,7 @@
     <h1>Reading a run</h1>
     <p class="lede">A normal run measures the fonts, prints a plan, asks before it writes, then lists what changed in each file. The sample below is the <a href="concepts.html#line-box">line box drawing</a>: an em of 1000, two styles, one shared box.</p>
 
-    <!-- Specimen: em 1000, Source Serif 4. Before 720 / 180 / gap 280. After 960 / 300 / gap 0. Keep in sync with concepts.html. -->
+    <!-- Specimen: em 1000, cap 670. Before 750 / 100 / gap 600. After 985 / 315 / gap 0. Keep in sync with concepts.html. -->
     <figure class="linebox" id="line-box">
       <div class="linebox-panels">
         <div class="linebox-panel">
@@ -61,8 +61,8 @@
             <div class="measure">1300<small>baselines</small></div>
           </div>
           <ul class="linebox-nums">
-            <li><span>Above baseline</span>920</li>
-            <li><span>Below baseline</span>380</li>
+            <li><span>Above baseline</span>985</li>
+            <li><span>Below baseline</span>315</li>
             <li><span>Line gap</span>0</li>
           </ul>
         </div>
@@ -74,7 +74,7 @@
         <li><i class="swatch base" aria-hidden="true"></i>Baseline</li>
       </ul>
       <figcaption>
-        A default run. The line box becomes 1300 units tall — 130% of the em — and the line gap becomes 0, so the baselines are 1300 apart. Above-baseline 750 becomes 920. Below-baseline 100 becomes 380, which is what stops the descenders hanging out of the box.
+        A default run. The line box becomes 1300 units tall — 130% of the em — and the line gap becomes 0, so the baselines are 1300 apart. The capitals are 670 and sit in the middle: 985 above the baseline, 315 below. That is what stops the descenders hanging out of the box.
       </figcaption>
     </figure>
 
@@ -93,15 +93,15 @@
 
 <span class="ok"> UPDATED</span>    /path/to/fonts/Example-Regular.otf
 OS/2 table:
-            usWinAscent: 760 → 920
-            usWinDescent: 120 → 380
-            sTypoAscender: 750 → 920
-            sTypoDescender: -100 → -380
+            usWinAscent: 760 → 985
+            usWinDescent: 120 → 315
+            sTypoAscender: 750 → 985
+            sTypoDescender: -100 → -315
             sTypoLineGap: 600 → 0
             fsSelection (USE_TYPO_METRICS): clear → set
 hhea table:
-            ascent: 750 → 920
-            descent: -100 → -380
+            ascent: 750 → 985
+            descent: -100 → -315
             lineGap: 600 → 0
             vertical span: 850 → 1300 (+45.0% UPM)
 
@@ -141,8 +141,8 @@ hhea table:
 
     <h2>The summary line</h2>
     <p><code>Family: Example (2 fonts)</code> is the group that shared a family name. <code>Core cluster: 2 fonts | UPM: 1000</code> means both styles were close enough in cap height to share one box. <code>1000</code> is the em. That number stays 1000.</p>
-    <p><code>UPM scaled by ~45.0%</code> is how far the box edges moved, added together, as a percent of the em. The top edge moves 170 units (920 − 750) and the bottom edge moves 280 units (380 − 100). 170 + 280 = 450, and 450 is 45% of 1000. When styles in the group move by different amounts, the printed figure is their average.</p>
-    <p><code>increasing vertical height by 52.9%</code> compares the new box with the old one. The box was 850 units tall (750 + 100) and is now 1300 (920 + 380). 1300 is 52.9% taller than 850. That 1300 is the default span floor: 130% of the em. The line gap is left out of that height.</p>
+    <p><code>UPM scaled by ~45.0%</code> is how far the box edges moved, added together, as a percent of the em. The top edge moves 235 units (985 − 750) and the bottom edge moves 215 units (315 − 100). 235 + 215 = 450, and 450 is 45% of 1000. When styles in the group move by different amounts, the printed figure is their average.</p>
+    <p><code>increasing vertical height by 52.9%</code> compares the new box with the old one. The box was 850 units tall (750 + 100) and is now 1300 (985 + 315). 1300 is 52.9% taller than 850. That 1300 is the default span floor: 130% of the em. The line gap is left out of that height.</p>
     <p><code>linegap set to 0</code> removes the warm band. Baseline-to-baseline distance is the box plus that gap: 850 + 600 = 1450 before, and 1300 + 0 = 1300 after.</p>
 
     <table>
@@ -175,11 +175,11 @@ hhea table:
       <tbody>
         <tr>
           <td><a href="https://learn.microsoft.com/en-us/typography/opentype/spec/os2#sTypoAscender"><code>sTypoAscender</code></a>, <a href="https://learn.microsoft.com/en-us/typography/opentype/spec/hhea#ascent">hhea ascent</a></td>
-          <td>Top of the line box. 750 → 920. The 920 is the capital height plus the default 25% of headroom.</td>
+          <td>Top of the line box. 750 → 985. The capitals are 670, centered in the 1300 box, so 985 is above the baseline and 315 is below.</td>
         </tr>
         <tr>
           <td><a href="https://learn.microsoft.com/en-us/typography/opentype/spec/os2#sTypoDescender"><code>sTypoDescender</code></a>, <a href="https://learn.microsoft.com/en-us/typography/opentype/spec/hhea#descent">hhea descent</a></td>
-          <td>Bottom of the line box. −100 → −380. The old 100 is shorter than the descenders, so they hang out. Together with 920, the new box is the 1300-unit default.</td>
+          <td>Bottom of the line box. −100 → −315. The old 100 is shorter than the descenders, so they hang out. Together with 985, the new box is the 1300-unit default.</td>
         </tr>
         <tr>
           <td><a href="https://learn.microsoft.com/en-us/typography/opentype/spec/os2#sTypoLineGap"><code>sTypoLineGap</code></a>, <a href="https://learn.microsoft.com/en-us/typography/opentype/spec/hhea#lineGap">hhea lineGap</a></td>
@@ -191,7 +191,7 @@ hhea table:
         </tr>
         <tr>
           <td><a href="https://learn.microsoft.com/en-us/typography/opentype/spec/os2#usWinAscent"><code>usWinAscent</code></a>, <a href="https://learn.microsoft.com/en-us/typography/opentype/spec/os2#usWinDescent"><code>usWinDescent</code></a></td>
-          <td>The clipping box: how far drawing may go before it is cut off. Ascent is above the baseline. Descent is below it and stored as a positive number (120 → 380). In this example they move out to the new box so the letters are not clipped.</td>
+          <td>The clipping box: how far drawing may go before it is cut off. Ascent is above the baseline. Descent is below it and stored as a positive number. In this example they move out to the new box, 985 / 315, so the letters are not clipped.</td>
         </tr>
         <tr>
           <td><code>vertical span</code></td>

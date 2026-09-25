@@ -1,31 +1,30 @@
 """Configuration constants and dataclasses for metrics normalization."""
 
 from dataclasses import dataclass
-from typing import Optional, Tuple
 
 
 # --- Unicode codepoints for referenced glyphs ---
-LOWER_ASCENDER_CODEPOINTS: Tuple[int, ...] = (
+LOWER_ASCENDER_CODEPOINTS: tuple[int, ...] = (
     0x0062,
     0x0064,
     0x0068,
     0x006B,
     0x006C,
 )  # b d h k l
-LOWER_DESCENDER_CODEPOINTS: Tuple[int, ...] = (
+LOWER_DESCENDER_CODEPOINTS: tuple[int, ...] = (
     0x0067,
     0x006A,
     0x0070,
     0x0071,
     0x0079,
 )  # g j p q y
-CAP_HEIGHT_GLYPHS: Tuple[int, ...] = (0x0048, 0x0049)  # 'H', 'I'
+CAP_HEIGHT_GLYPHS: tuple[int, ...] = (0x0048, 0x0049)  # 'H', 'I'
 U_LOWER_X: int = 0x0078  # 'x'
 UPPER_A: int = 0x0041
 UPPER_Z: int = 0x005A
 
 # Lowercase letters for x-height sampling (exclude ascenders/descenders)
-LOWERCASE_XHEIGHT_SAMPLES: Tuple[int, ...] = (
+LOWERCASE_XHEIGHT_SAMPLES: tuple[int, ...] = (
     0x0061,  # a
     0x0063,  # c
     0x0065,  # e
@@ -42,14 +41,14 @@ LOWERCASE_XHEIGHT_SAMPLES: Tuple[int, ...] = (
 )
 
 # Codepoints for uniwidth detection (A-Z, a-z, 0-9)
-UNIWIDTH_SAMPLE_CODEPOINTS: Tuple[int, ...] = (
+UNIWIDTH_SAMPLE_CODEPOINTS: tuple[int, ...] = (
     *range(0x0041, 0x005B),  # A-Z
     *range(0x0061, 0x007B),  # a-z
     *range(0x0030, 0x003A),  # 0-9
 )
 
 # Uppercase letters for cap height sampling (flat tops, no curves that might exceed)
-UPPERCASE_CAPHEIGHT_SAMPLES: Tuple[int, ...] = (
+UPPERCASE_CAPHEIGHT_SAMPLES: tuple[int, ...] = (
     0x0042,  # B
     0x0044,  # D
     0x0045,  # E
@@ -67,7 +66,7 @@ UPPERCASE_CAPHEIGHT_SAMPLES: Tuple[int, ...] = (
 
 # Accented capitals used as a hard typo-ascender clearance floor (GF-style).
 # If none of these exist in the font, planning estimates and flags a re-check.
-ACCENTED_CAP_CODEPOINTS: Tuple[int, ...] = (
+ACCENTED_CAP_CODEPOINTS: tuple[int, ...] = (
     0x00C0,  # À
     0x00C1,  # Á
     0x00C2,  # Â
@@ -121,12 +120,6 @@ class MetricsConfig:
         0.025  # 2.5% UPM for identical detection (validated optimal)
     )
     top_margin: float = 0.25  # Internal: as fraction (0.25 = 25% of UPM)
-    ascender_override_threshold: float = (
-        0.5  # Fraction of top_margin to trigger ascender override (default: 0.5 = 50%)
-    )
-    max_adjustment: Optional[float] = (
-        None  # Internal: as fraction (0.08 = 8% max adjustment)
-    )
     # Clustering thresholds
     max_span_ratio: float = (
         1.5  # Pre-check rejection threshold (separate from decorative detection)
@@ -141,15 +134,15 @@ class MetricsConfig:
     script_win_buffer_multiplier: float = (
         1.5  # Buffer multiplier for script fonts (1.5x default)
     )
-    # Kept for CLI --no-auto-adjust compatibility; x-height no longer raises the span floor.
-    auto_adjust_target: bool = False
-    # Unify typo line box across a family for UI centering issues (mixed width masters)
-    force_baseline: bool = False
-    # Prefer reference master from largest optical cluster only (omit height/width extremes)
-    force_baseline_main_cluster_only: bool = False
-    # Exact path, basename, or glob fnmatch basename (e.g. "Family-Bold.otf", "Flexible-*W500.otf")
-    force_baseline_from_pattern: Optional[str] = None
     # Uniwidth detection
     uniwidth_consistency_threshold: float = (
         0.90  # 90% of sampled glyphs must have identical advance widths
     )
+
+    def exclusion_span(self, threshold: float) -> float:
+        """How far past a span line a font must be before it leaves the shared box.
+
+        Staying in is the cheap mistake. Leaving has to clear the line by
+        half the optical-match tolerance, not merely touch it.
+        """
+        return threshold + self.optical_threshold / 2.0

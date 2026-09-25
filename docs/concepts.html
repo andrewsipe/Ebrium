@@ -39,7 +39,7 @@
     <h2 id="line-box">Typo / hhea vs Win</h2>
     <p>A default run makes the line box at least 130% of the em — 1300 units when the em is 1000 — and sets the line gap to 0. Baseline to baseline is then 1300. The before picture is a file that has not been through that run. The letters stay the same size, and the em stays 1000.</p>
 
-    <!-- Specimen: em 1000, Source Serif 4. Before 720 / 180 / gap 280. After 960 / 300 / gap 0. Keep in sync with terminal.html. -->
+    <!-- Specimen: em 1000, cap 670. Before 750 / 100 / gap 600. After 985 / 315 / gap 0. Keep in sync with terminal.html. -->
     <figure class="linebox">
       <div class="linebox-panels">
         <div class="linebox-panel">
@@ -69,8 +69,8 @@
             <div class="measure">1300<small>baselines</small></div>
           </div>
           <ul class="linebox-nums">
-            <li><span>Above baseline</span>920</li>
-            <li><span>Below baseline</span>380</li>
+            <li><span>Above baseline</span>985</li>
+            <li><span>Below baseline</span>315</li>
             <li><span>Line gap</span>0</li>
           </ul>
         </div>
@@ -82,14 +82,14 @@
         <li><i class="swatch base" aria-hidden="true"></i>Baseline</li>
       </ul>
       <figcaption>
-        The em is 1000. Before, the box is only 850 tall, so the descenders hang out of it, and a 600-unit gap sits between lines. The baselines are 1450 apart. After a default run the box is 1300 tall and the gap is 0, so the baselines are 1300 apart. 920 of that box is above the baseline: the capital height plus the default 25% of headroom. <a href="terminal.html">Reading a run</a> uses these numbers.
+        The em is 1000 and the capitals are 670. Before, the box is only 850 tall, so the descenders hang out of it, and a 600-unit gap sits between lines. The baselines are 1450 apart. After a default run the box is 1300 tall and the gap is 0, so the baselines are 1300 apart. The capitals sit in the middle of that box: 985 above the baseline and 315 below. <a href="terminal.html">Reading a run</a> uses these numbers.
       </figcaption>
     </figure>
 
     <ul>
       <li><a href="https://learn.microsoft.com/en-us/typography/opentype/spec/os2#sTypoAscender"><code>sTypoAscender</code></a> / <a href="https://learn.microsoft.com/en-us/typography/opentype/spec/os2#sTypoDescender"><code>sTypoDescender</code></a> / <a href="https://learn.microsoft.com/en-us/typography/opentype/spec/os2#sTypoLineGap"><code>sTypoLineGap</code></a> (OS/2) and matching <a href="https://learn.microsoft.com/en-us/typography/opentype/spec/hhea"><code>hhea</code></a> values define the line box many apps use when <a href="https://learn.microsoft.com/en-us/typography/opentype/spec/os2#fsSelection"><code>USE_TYPO_METRICS</code></a> is on (OS/2 v4+).</li>
-      <li><a href="https://learn.microsoft.com/en-us/typography/opentype/spec/os2#usWinAscent"><code>usWinAscent</code></a> / <a href="https://learn.microsoft.com/en-us/typography/opentype/spec/os2#usWinDescent"><code>usWinDescent</code></a> are clipping bounds. Family-wide Win uses normalized extremes so nothing clips; decorative outliers can expand Win while still inheriting typo from the core cluster.</li>
-      <li>Line gaps are set to <strong>zero</strong> across typo and hhea.</li>
+      <li><a href="https://learn.microsoft.com/en-us/typography/opentype/spec/os2#usWinAscent"><code>usWinAscent</code></a> / <a href="https://learn.microsoft.com/en-us/typography/opentype/spec/os2#usWinDescent"><code>usWinDescent</code></a> are clipping bounds. Win is the family’s outline extremes plus 2%, and it is never shorter than the line box. Effect and script cuts inherit the line box and can widen Win.</li>
+      <li>The line gap is <strong>0</strong> unless you pass <code>--line-gap</code>. The same number is written to typo and hhea.</li>
     </ul>
 
     <h2>Where the line box comes from</h2>
@@ -109,7 +109,7 @@
     <p><code>--span</code> (default 130) is the letter-span floor, as a percent of the em. 120 is tighter, 150 is looser. A measured accent or descender can still raise the box. <code>--line-gap</code> (default 0) adds space between lines, also as a percent of the em. 5 is slightly looser.</p>
 
     <h2>Shared box</h2>
-    <p>A run gives the core styles in a family one line box. <code>probe</code> shows how far each file’s stored ascender would move to match it. <code>--no-cluster</code> replaces that plan with one box from the family’s outline extremes.</p>
+    <p>A run gives the core styles in a family one line box. <code>--match "Family A,Family B"</code> puts two families that do not already share a name onto that same box. <code>probe</code> shows how far each file’s stored ascender would move to match it. <code>--no-cluster</code> replaces that plan with one box from the family’s outline extremes.</p>
 
     <h2 id="assume">Detection labels</h2>
     <p>The program marks a face as script, an effect cut, unicase, or uniwidth from the outlines and the file name. You do not pass a flag for that. In the pictures, the solid box is the shared line box and the dashed box is the clipping box.</p>
@@ -123,7 +123,7 @@
           <span class="word">Playfully</span>
           <i class="bl"></i>
         </div>
-        <p class="what">The script keeps the family’s line box. The clipping box grows around the swashes, with extra room below.</p>
+        <p class="what">A script is an outline about twice the em, and heavier below the baseline. A face that only just reaches that stays with the core. When a script does leave, it keeps the family’s line box, and the clipping box grows around the swashes. The review says how much the line box would have moved if it had stayed.</p>
       </article>
       <article class="mode">
         <p class="meta">decorative</p>
@@ -134,11 +134,11 @@
           <span class="word">Decorative</span>
           <i class="bl"></i>
         </div>
-        <p class="what">Effect cuts such as Shadow, Extrude, and Fine keep the Face line box. The clipping box grows around the extra outline so it does not set the family’s spacing.</p>
+        <p class="what">Effect cuts such as Shadow, Extrude, and Fine inherit the box set by a Face in the same family. The clipping box grows around the extra outline. Without a Face file, those cuts stay in the core.</p>
       </article>
       <article class="mode">
         <p class="meta">unicase</p>
-        <h3>One letter height, one baseline</h3>
+        <h3>Same centered box</h3>
         <div class="stage align-stage" aria-hidden="true">
           <div class="pair">
             <span class="face">Hx</span>
@@ -146,7 +146,7 @@
             <span class="xlab">x-height</span>
           </div>
         </div>
-        <p class="what">The unicase sits on the text face’s baseline, and its letter height lines up with that face’s x-height. It needs less room above the letters.</p>
+        <p class="what">A unicase family gets the same centered box as a text family with the same cap height. The shorter seed above the letters is usually absorbed by the span floor.</p>
       </article>
       <article class="mode">
         <p class="meta">uniwidth</p>
@@ -162,7 +162,7 @@
     </div>
 
     <h2>Optical sizes</h2>
-    <p>Caption, Display, Subhead, and Small Text each keep their own line box. A variable font stays with its own family name. It is not merged into the statics.</p>
+    <p>Caption, Display, Subhead, and Small Text each keep their own line box. A variable font stays with its own family name, separate from the statics. <code>--match</code> is how you pair names that should share a box anyway.</p>
 
     <h2>Checkpoint</h2>
     <div class="callout warn">

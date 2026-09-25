@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-import fnmatch
-import sys
 import unicodedata
 from pathlib import Path
-from typing import TYPE_CHECKING, List, Optional, Tuple
+from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
     from fontTools.ttLib import TTFont
@@ -64,7 +62,7 @@ def _cap_height(font: TTFont) -> Optional[int]:
 
 def _cap_height_optical(font: TTFont) -> Optional[int]:
     """Estimate optical cap height using median yMax across A–Z."""
-    ymax_values: List[int] = []
+    ymax_values: list[int] = []
     for cp in range(UPPER_A, UPPER_Z + 1):
         b = _codepoint_bounds(font, cp)
         if not b:
@@ -114,7 +112,7 @@ def _descender_min(font: TTFont) -> Optional[int]:
     return int(round(min_y))
 
 
-def _accented_cap_max(font: TTFont) -> Tuple[Optional[int], bool]:
+def _accented_cap_max(font: TTFont) -> tuple[Optional[int], bool]:
     """Tallest accented-capital yMax (hard typo-ascender floor).
 
     Returns (yMax, missing). missing=True when none of the sample glyphs exist.
@@ -172,7 +170,7 @@ def _get_x_height_from_glyphs(font: TTFont) -> Optional[int]:
     return None
 
 
-def _get_x_height_from_glyphs_robust(font: TTFont) -> Optional[Tuple[int, int, int]]:
+def _get_x_height_from_glyphs_robust(font: TTFont) -> Optional[tuple[int, int, int]]:
     """Get x-height by measuring multiple lowercase glyphs (robust sampling).
 
     Samples multiple lowercase letters to get a more representative x-height,
@@ -181,7 +179,7 @@ def _get_x_height_from_glyphs_robust(font: TTFont) -> Optional[Tuple[int, int, i
     Returns:
         Tuple of (median, min, max) x-heights, or None if insufficient data
     """
-    heights: List[int] = []
+    heights: list[int] = []
 
     for cp in LOWERCASE_XHEIGHT_SAMPLES:
         b = _codepoint_bounds(font, cp)
@@ -207,7 +205,7 @@ def _get_x_height_from_glyphs_robust(font: TTFont) -> Optional[Tuple[int, int, i
     return (median, heights[0], heights[-1])
 
 
-def _get_cap_height_from_glyphs_robust(font: TTFont) -> Optional[Tuple[int, int, int]]:
+def _get_cap_height_from_glyphs_robust(font: TTFont) -> Optional[tuple[int, int, int]]:
     """Get cap-height by measuring multiple uppercase glyphs (robust sampling).
 
     Samples multiple uppercase letters to get a more representative cap-height,
@@ -216,7 +214,7 @@ def _get_cap_height_from_glyphs_robust(font: TTFont) -> Optional[Tuple[int, int,
     Returns:
         Tuple of (median, min, max) cap-heights, or None if insufficient data
     """
-    heights: List[int] = []
+    heights: list[int] = []
 
     for cp in UPPERCASE_CAPHEIGHT_SAMPLES:
         b = _codepoint_bounds(font, cp)
@@ -274,10 +272,10 @@ def detect_decorative_standalone(
     # Calculate span ratio
     fm_span = (fm.max_y - fm.min_y) / fm.upm
 
-    # Decorative fonts have moderately large span (1.4x-2.0x)
-    # Below 1.4x: normal font
-    # Above 2.0x: likely script (should be caught by script detection)
-    if config.decorative_span_threshold <= fm_span < config.script_span_threshold:
+    # Decorative fonts have a span past the decorative line, and short of a script.
+    # The lower line includes a margin, so a font that only just crosses 1.4 stays in.
+    floor = config.exclusion_span(config.decorative_span_threshold)
+    if floor <= fm_span < config.script_span_threshold:
         return True
 
     return False
@@ -287,34 +285,21 @@ def is_script_font(
     fm: FontMeasures,
     script_span_threshold: float = 2.0,
     script_asymmetry_ratio: float = 1.2,
-    min_span_ratio: float = 1.5,
+    exclusion_margin: float = 0.0125,
 ) -> bool:
-    """Detect script fonts based on span and descender-dominance characteristics.
+    """Detect a script from its own outlines.
 
-    Script fonts typically have:
-    - Large vertical span (swashes extend far above/below)
-    - Descender-dominant (swashes go down more than up)
-
-    This is a standalone detection that doesn't require cluster comparison.
-    Clustering may refine this detection by comparing to family average.
-
-    Args:
-        fm: FontMeasures with min_y, max_y, and upm set
-        script_span_threshold: Minimum span ratio vs typical font (default: 2.0x)
-        script_asymmetry_ratio: Descender must exceed ascender by this ratio (default: 1.2x)
-        min_span_ratio: Minimum span as ratio of UPM to consider (default: 1.5x)
-
-    Returns:
-        True if font is detected as script
+    The span must clear ``script_span_threshold`` by ``exclusion_margin``
+    (half the default optical-match tolerance), and the descenders must
+    outweigh the ascenders. A face that only just reaches 2.0 stays in the
+    shared box. Clustering can still mark a companion that clears twice
+    the rest of the family by that same margin.
     """
     if fm.max_y is None or fm.min_y is None or fm.upm <= 0:
         return False
 
-    # Calculate span as ratio of UPM
     fm_span = (fm.max_y - fm.min_y) / fm.upm
-
-    # Script fonts have unusually large span (at least min_span_ratio of UPM)
-    if fm_span < min_span_ratio:
+    if fm_span < script_span_threshold + exclusion_margin:
         return False
 
     # Check descender-dominance (script swashes go down more than up)
@@ -388,18 +373,14 @@ def is_unicase(
 
 
 def measure_fonts(
-    filepaths: List[str],
-    existing_measures: Optional[List[FontMeasures]] = None,
+    filepaths: list[str],
+    existing_measures: Optional[list[FontMeasures]] = None,
     unicase_threshold: float = 0.05,
     script_span_threshold: float = 2.0,
     script_asymmetry_ratio: float = 1.2,
+    exclusion_margin: float = 0.0125,
     decorative_span_threshold: float = 1.4,
-    assume_script: Optional[List[str]] = None,
-    assume_decorative: Optional[List[str]] = None,
-    assume_unicase: Optional[List[str]] = None,
-    assume_uniwidth: Optional[List[str]] = None,
-    exclude_measuring: Optional[List[str]] = None,
-) -> List[FontMeasures]:
+) -> list[FontMeasures]:
     """Measure fonts and extract family names.
 
     Args:
@@ -416,7 +397,7 @@ def measure_fonts(
 
     # Filter out files already measured
     files_to_measure = [fp for fp in filepaths if fp not in existing_by_path]
-    measures: List[FontMeasures] = list(existing_by_path.values())
+    measures: list[FontMeasures] = list(existing_by_path.values())
 
     if not files_to_measure:
         return measures  # All files already in checkpoint
@@ -538,81 +519,23 @@ def measure_fonts(
                 if not fm.is_unicase and (filename_hint or family_name_hint):
                     fm.is_unicase = True
 
-                # Check pattern overrides FIRST (before automatic detection)
-                filename = Path(fp).name
-                forced_unicase = False
-                forced_script = False
-                forced_decorative = False
-
-                # Check if font should be excluded from family calculations
-                if exclude_measuring:
-                    for pattern in exclude_measuring:
-                        if fnmatch.fnmatch(filename, pattern):
-                            fm.is_excluded_from_calculations = True
-                            break
-
-                if assume_unicase:
-                    for pattern in assume_unicase:
-                        if fnmatch.fnmatch(filename, pattern):
-                            forced_unicase = True
-                            break
-
-                if assume_script:
-                    for pattern in assume_script:
-                        if fnmatch.fnmatch(filename, pattern):
-                            forced_script = True
-                            break
-
-                if assume_decorative:
-                    for pattern in assume_decorative:
-                        if fnmatch.fnmatch(filename, pattern):
-                            forced_decorative = True
-                            break
-
-                # Unified detection phase (with pattern overrides)
-                # Priority: forced > automatic detection
-                # Order matters: unicase → script → decorative
-
-                # 1. Unicase detection
-                if forced_unicase:
-                    fm.is_unicase = True
-                # (automatic unicase detection already done above)
-
-                # 2. Script detection
-                if forced_script:
-                    fm.is_script = True
-                else:
-                    fm.is_script = is_script_font(
-                        fm,
-                        script_span_threshold=script_span_threshold,
-                        script_asymmetry_ratio=script_asymmetry_ratio,
-                    )
-
-                # 3. Decorative detection (requires config object)
-                from . import config
-
-                temp_config = config.MetricsConfig(
-                    decorative_span_threshold=decorative_span_threshold
+                fm.is_script = is_script_font(
+                    fm,
+                    script_span_threshold=script_span_threshold,
+                    script_asymmetry_ratio=script_asymmetry_ratio,
+                    exclusion_margin=exclusion_margin,
                 )
-                if forced_decorative:
-                    fm.is_decorative_candidate = True
-                else:
-                    fm.is_decorative_candidate = detect_decorative_standalone(
-                        fm, temp_config
-                    )
-
-                # 4. Collect advance widths for uniwidth detection
+                temp_config = config.MetricsConfig(
+                    decorative_span_threshold=decorative_span_threshold,
+                    script_span_threshold=script_span_threshold,
+                    optical_threshold=exclusion_margin * 2.0,
+                )
+                fm.is_decorative_candidate = detect_decorative_standalone(
+                    fm, temp_config
+                )
                 fm.advance_widths = _glyph_advance_widths(
                     font, UNIWIDTH_SAMPLE_CODEPOINTS
                 )
-
-                # 5. Uniwidth force flag (per-font hint; family-level
-                #    detection happens later in planning)
-                if assume_uniwidth:
-                    for pattern in assume_uniwidth:
-                        if fnmatch.fnmatch(filename, pattern):
-                            fm.is_uniwidth = True
-                            break
 
                 measures.append(fm)
             except Exception as e:

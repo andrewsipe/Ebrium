@@ -34,8 +34,20 @@ class ParserTest(unittest.TestCase):
         }
         self.assertNotIn("--scope", options)
         self.assertIn("--no-cluster", options)
+        self.assertIn("--match", options)
         with self.assertRaises(SystemExit):
             build_parser().parse_args(["--scope", "superfamily"])
+
+    def test_match_pairs_family_names(self) -> None:
+        args = build_parser().parse_args(["--match", "Family A,Family B", "fonts/"])
+        finalize_args(args)
+        self.assertEqual(args.combine, ["Family A,Family B"])
+        self.assertEqual(args.grouping_mode, "family")
+        hidden = build_parser().parse_args(["--merge", "Family A,Family B"])
+        self.assertEqual(hidden.combine, ["Family A,Family B"])
+        help_text = build_parser().format_help()
+        self.assertIn("--match", help_text)
+        self.assertNotIn("--merge", help_text)
 
 
 if __name__ == "__main__":

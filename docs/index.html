@@ -44,6 +44,7 @@ ebrium fonts/ -r -n</code></pre>
     <ul>
       <li><code>ebrium fonts/ -r -n</code> — one centered line box per family</li>
       <li><code>--no-cluster</code> — the same family, one box from the outline extremes so nothing clips</li>
+      <li><code>--match "Family A,Family B"</code> — one box for family names that do not already group</li>
       <li><code>ebrium probe</code> — read-only</li>
     </ul>
     <p>A run rewrites a variable font's default instance only and leaves <a href="https://learn.microsoft.com/en-us/typography/opentype/spec/mvar">MVAR</a> and <a href="https://learn.microsoft.com/en-us/typography/opentype/spec/hvar">HVAR</a> alone. <code>probe</code> reads that default instance and does not write.</p>
@@ -63,7 +64,7 @@ ebrium fonts/ -r -n</code></pre>
       </a>
       <a class="card" href="flags.html">
         <h2>Flag reference</h2>
-        <p>What each subcommand accepts, short flags, and the traps worth knowing.</p>
+        <p>What the command accepts: preview, span, line gap, pairing mismatched names, and the outline-extremes plan.</p>
       </a>
       <a class="card" href="report.html">
         <h2>Reading probe</h2>
@@ -71,7 +72,7 @@ ebrium fonts/ -r -n</code></pre>
       </a>
     </div>
 
-    <p>CLI help stays the live source for wording: <code>ebrium &lt;subcommand&gt; --help</code>.</p>
+    <p>CLI help stays the live source for wording: <code>ebrium --help</code>.</p>
   </main>
 
   <footer class="site-footer">

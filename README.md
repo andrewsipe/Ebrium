@@ -36,6 +36,9 @@ ebrium /path/to/fonts -r -n
 # Outline extremes, so nothing clips
 ebrium /path/to/fonts -r --no-cluster
 
+# One box for two family names that do not already group
+ebrium /path/to/fonts -r --match "Family A,Family B"
+
 # Read-only metrics
 ebrium probe /path/to/fonts -r
 ```

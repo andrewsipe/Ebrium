@@ -2,7 +2,7 @@
 
 import re
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Optional
 
 from . import config
 from . import models
@@ -99,52 +99,9 @@ def compute_optical_similarity(
     return True
 
 
-def compute_optical_variance(measures: List[FontMeasures]) -> Dict[str, float]:
-    """Calculate coefficient of variation for key metrics across a group.
-
-    Returns dict with CV (coefficient of variation) for:
-    - cap_height_ratio: cap_height/UPM
-    - x_height_ratio: x_height/UPM
-    - descender_ratio: descender_min/UPM
-
-    Low CV (< 0.05 or 5%) indicates fonts are optically identical.
-    High CV (> 0.15 or 15%) indicates significant variation.
-    """
-    if len(measures) < 2:
-        return {"cap_height_cv": 0.0, "x_height_cv": 0.0, "descender_cv": 0.0}
-
-    cap_ratios: List[float] = []
-    x_height_ratios: List[float] = []
-    descender_ratios: List[float] = []
-
-    for fm in measures:
-        if fm.cap_height is not None and fm.upm > 0:
-            cap_ratios.append(float(fm.cap_height) / float(fm.upm))
-        if fm.x_height is not None and fm.upm > 0:
-            x_height_ratios.append(float(fm.x_height) / float(fm.upm))
-        if fm.descender_min is not None and fm.upm > 0:
-            descender_ratios.append(abs(float(fm.descender_min)) / float(fm.upm))
-
-    def compute_cv(values: List[float]) -> float:
-        if not values or len(values) < 2:
-            return 0.0
-        mean = sum(values) / len(values)
-        if mean == 0:
-            return 0.0
-        variance = sum((v - mean) ** 2 for v in values) / len(values)
-        std_dev = variance**0.5
-        return (std_dev / mean) if mean != 0 else 0.0
-
-    return {
-        "cap_height_cv": compute_cv(cap_ratios) if cap_ratios else 0.0,
-        "x_height_cv": compute_cv(x_height_ratios) if x_height_ratios else 0.0,
-        "descender_cv": compute_cv(descender_ratios) if descender_ratios else 0.0,
-    }
-
-
 def detect_decorative_outlier(
     fm: FontMeasures,
-    core_cluster: List[FontMeasures],
+    core_cluster: list[FontMeasures],
     threshold: float,
     config: MetricsConfig,
 ) -> bool:
@@ -208,39 +165,32 @@ def detect_decorative_outlier(
     fm_max_norm = fm.max_y / fm.upm if fm.max_y and fm.upm > 0 else 0
     fm_min_norm = fm.min_y / fm.upm if fm.min_y and fm.upm > 0 else 0
 
-    # If bounds are >15% larger than cluster average, it's decorative
+    # If bounds clear the cluster by more than 15% plus the exclusion margin.
     max_inflation = (
         (fm_max_norm - cluster_max_avg) / cluster_max_avg if cluster_max_avg else 0
     )
     min_inflation = (
         abs((fm_min_norm - cluster_min_avg) / cluster_min_avg) if cluster_min_avg else 0
     )
-
-    return max_inflation > 0.15 or min_inflation > 0.15
+    margin = config.optical_threshold / 2.0
+    return max_inflation > 0.15 + margin or min_inflation > 0.15 + margin
 
 
 def detect_script_font(
     fm: FontMeasures,
-    core_cluster: List[FontMeasures],
+    core_cluster: list[FontMeasures],
     config: MetricsConfig,
 ) -> bool:
-    """Refine script detection using cluster context.
+    """A companion is a script when it matches the core and its span is twice as tall.
 
-    Confirms/rejects script flag from measurement phase.
-
-    Requirements:
-    - Standalone detection flagged as script OR
-    - Core metrics match cluster but span is 2.0x+ larger
+    The absolute 2.0× em check already happened in measurement. This one
+    compares the font with the core, and it does not skip that comparison
+    because measurement already set a flag.
     """
     if not core_cluster:
-        # No cluster context - trust standalone detection
         return fm.is_script
 
-    # If already detected during measurement, confirm
-    if fm.is_script:
-        return True
-
-    # Additional check using cluster context
+    # Relative check against the core.
     # Check if core metrics match any font in cluster (same letter body)
     matches_core = any(
         compute_optical_similarity(fm, core_fm, config.optical_threshold, config)
@@ -271,7 +221,7 @@ def detect_script_font(
     span_ratio = fm_span / avg_cluster_span
 
     # Script threshold: 2.0x span (vs decorative 1.3x)
-    if span_ratio < config.script_span_threshold:
+    if span_ratio < config.exclusion_span(config.script_span_threshold):
         return False
 
     # AND descender-dominant (script swashes go down more than up)
@@ -285,10 +235,10 @@ def detect_script_font(
     return False
 
 
-def _name_tokens(fm: FontMeasures) -> List[str]:
+def _name_tokens(fm: FontMeasures) -> list[str]:
     """Split a filename stem into lowercase tokens (hyphens and CamelCase)."""
     stem = Path(fm.path).stem
-    tokens: List[str] = []
+    tokens: list[str] = []
     for part in re.split(r"[-_ ]+", stem):
         tokens.extend(
             re.findall(r"[A-Z]+(?=[A-Z][a-z])|[A-Z]?[a-z]+|[A-Z]+|\d+", part)
@@ -305,14 +255,13 @@ def _is_effect_cut(fm: FontMeasures) -> bool:
 
 
 def peel_effect_outliers(
-    group: List[FontMeasures],
-) -> Tuple[List[FontMeasures], List[FontMeasures]]:
-    """Split Face cores from effect cuts, and honor ``--assume decorative``.
+    group: list[FontMeasures],
+) -> tuple[list[FontMeasures], list[FontMeasures]]:
+    """Split Face cores from effect cuts.
 
     When the group contains a Face style, effect-token styles inherit typo
-    instead of joining the optical cluster (Rig Shadow/Extrude/Fine, etc.).
-    ``--assume decorative`` peels a style the same way even without a Face
-    token, unless that style is itself a Face cut.
+    instead of joining the optical cluster. A font already marked decorative
+    peels the same way even without a Face token, unless it is itself a Face cut.
 
     Returns (remaining, decorative_outliers). Remaining is never emptied
     solely by this split — if nothing would be left to plan, the group is
@@ -322,8 +271,8 @@ def peel_effect_outliers(
         return group, []
 
     has_face = any(_is_face_cut(fm) for fm in group)
-    remaining: List[FontMeasures] = []
-    peeled: List[FontMeasures] = []
+    remaining: list[FontMeasures] = []
+    peeled: list[FontMeasures] = []
 
     for fm in group:
         face = _is_face_cut(fm)
@@ -345,10 +294,10 @@ def peel_effect_outliers(
 
 
 def cluster_group_helper(
-    group: List[FontMeasures],
+    group: list[FontMeasures],
     threshold: float,
     config: MetricsConfig,
-) -> Tuple[List[List[FontMeasures]], List[FontMeasures], List[FontMeasures]]:
+) -> tuple[list[list[FontMeasures]], list[FontMeasures], list[FontMeasures]]:
     """Cluster a single group of fonts (original clustering logic).
 
     Returns: (core_clusters, decorative_outliers, script_outliers)
@@ -362,7 +311,7 @@ def cluster_group_helper(
 
     # Build similarity graph based on cap height + x-height + descender
     n = len(group)
-    similar_pairs: List[Tuple[int, int]] = []
+    similar_pairs: list[tuple[int, int]] = []
 
     for i in range(n):
         for j in range(i + 1, n):
@@ -394,7 +343,7 @@ def cluster_group_helper(
         union(i, j)
 
     # Group by cluster
-    clusters_dict: Dict[int, List[FontMeasures]] = {}
+    clusters_dict: dict[int, list[FontMeasures]] = {}
     for idx, fm in enumerate(group):
         root = find(idx)
         clusters_dict.setdefault(root, []).append(fm)
@@ -416,7 +365,8 @@ def cluster_group_helper(
     true_outliers = []
 
     for fm in singletons:
-        # Refine script detection (measurement flag + cluster check)
+        # Absolute 2.0× em scripts stay scripts. This can also add a
+        # companion that is twice the core even when it is under 2.0× the em.
         is_script_refined = detect_script_font(fm, main_cluster, config)
         if is_script_refined or fm.is_script:
             script_outliers.append(fm)
@@ -444,8 +394,8 @@ def cluster_group_helper(
 
 
 def detect_optical_clusters(
-    measures: List[FontMeasures], threshold: float, config: MetricsConfig
-) -> Tuple[List[List[FontMeasures]], List[FontMeasures], List[FontMeasures]]:
+    measures: list[FontMeasures], threshold: float, config: MetricsConfig
+) -> tuple[list[list[FontMeasures]], list[FontMeasures], list[FontMeasures]]:
     """Detect core clusters and decorative outliers based on cap height.
 
     Unicase fonts are treated as special decorative variants that inherit

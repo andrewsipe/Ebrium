@@ -39,10 +39,11 @@
         <tr><td><code>--span %</code></td><td>Letter-span floor (default 130). Tighter 120, looser 150.</td></tr>
         <tr><td><code>--line-gap %</code></td><td>Extra space between lines (default 0). 5 is slightly looser.</td></tr>
         <tr><td><code>--no-cluster</code></td><td>One box from the family's outline extremes, so nothing clips.</td></tr>
+        <tr><td><code>--match "Family A,Family B"</code></td><td>Pair family names that do not already group, so they share one line box. Repeat the flag for another pair.</td></tr>
         <tr><td><code>ebrium probe fonts/ -r</code></td><td>Read the metrics. Write nothing.</td></tr>
       </tbody>
     </table>
-    <p>Effect cuts inherit the family box. Caption, Display, Subhead, and Small Text each keep their own. A review at the end names anything worth a look. The box is 130% of the em at minimum, capitals centered, with room for a real accent or descender.</p>
+    <p>Effect cuts inherit the family box. Caption, Display, Subhead, and Small Text each keep their own. A review at the end names anything worth a look, including how much the line box would have moved if a script or effect cut had stayed in the core. The box is 130% of the em at minimum, capitals centered, with room for a real accent or descender.</p>
 
   </main>
 

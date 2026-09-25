@@ -6,7 +6,7 @@ Standalone product tree for https://github.com/andrewsipe/ebrium
 
 One command groups by family name and writes one centered line box.
 `ebrium probe` reads and does not write. Overrides: `--span`, `--line-gap`,
-`--no-cluster`.
+`--no-cluster`, `--match`.
 
 ## Origin
 

@@ -11,12 +11,13 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Optional
+from collections.abc import Sequence
 
 from .models import FontMeasures
 
 # Longest phrases first so "small text" wins over "text".
-_OPSZ_PHRASES: Tuple[Tuple[str, str], ...] = (
+_OPSZ_PHRASES: tuple[tuple[str, str], ...] = (
     ("small text", "Small Text"),
     ("smalltext", "Small Text"),
     ("caption", "Caption"),
@@ -50,8 +51,8 @@ def optical_size_label(fm: FontMeasures) -> Optional[str]:
 
 
 def split_optical_size_groups(
-    group: List[FontMeasures],
-) -> List[Tuple[str, List[FontMeasures]]]:
+    group: list[FontMeasures],
+) -> list[tuple[str, list[FontMeasures]]]:
     """Return one bucket, or several when the peer set mixes optical sizes.
 
     Unlabeled styles become ``Text`` only when another named size is present.
@@ -66,7 +67,7 @@ def split_optical_size_groups(
     if not named:
         return [("default", group)]
 
-    buckets: dict[str, List[FontMeasures]] = {}
+    buckets: dict[str, list[FontMeasures]] = {}
     for lab, fm in labeled:
         buckets.setdefault(lab or "Text", []).append(fm)
 
@@ -77,15 +78,24 @@ def split_optical_size_groups(
 
 
 def expand_optical_size_groups(
-    families: dict[str, List[FontMeasures]],
-) -> dict[str, List[FontMeasures]]:
+    families: dict[str, list[FontMeasures]],
+    matched: Optional[Sequence[Sequence[str]]] = None,
+) -> dict[str, list[FontMeasures]]:
     """Rename mixed optical-size groups so each planned box has its own key.
 
     ``build_plans`` reports those names. The change summary looks families up
     by the same key, so the split has to happen before that lookup.
+
+    ``matched`` is the family-name groups from ``--match``. Those stay one
+    box; optical size does not pull an explicit pair apart.
     """
-    expanded: dict[str, List[FontMeasures]] = {}
+    pairs = matched or []
+    expanded: dict[str, list[FontMeasures]] = {}
     for fam, group in families.items():
+        found = {fm.family_name for fm in group}
+        if any(len(found.intersection(names)) >= 2 for names in pairs):
+            expanded[fam] = group
+            continue
         subgroups = split_optical_size_groups(group)
         if len(subgroups) < 2:
             expanded[fam] = group

@@ -454,7 +454,7 @@ td code {
 
 /* Paragraph specimen. Lengths are rem so the baseline bracket
    does not shrink to the label's font size.
-   Source Serif 4 baseline is 0.855em from the top of a line-height:1 box. */
+   The specimen serif's baseline sits 0.855em from the top of a line-height:1 box. */
 .stack {
   --fs: 1.55rem;
   position: relative;
@@ -484,10 +484,9 @@ td code {
 }
 
 .stack.after {
-  /* Default: cap 670 + 25% headroom = 920 above, 380 below.
-     Span 1300. Line gap 0. Baselines 1300. */
-  --above: calc(0.92 * var(--fs));
-  --below: calc(0.38 * var(--fs));
+  /* Cap 670, centered in a 1300 box: 985 above, 315 below. Line gap 0. */
+  --above: calc(0.985 * var(--fs));
+  --below: calc(0.315 * var(--fs));
   --gap: 0px;
   --overlap: 1.5px;
 }

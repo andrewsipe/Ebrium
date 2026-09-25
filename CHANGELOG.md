@@ -14,11 +14,15 @@ The command groups by family name and writes one centered line box.
   box. Optical sizes named Caption, Display, Subhead, or Small Text each
   keep their own. A layered or color set copies one box across its files.
 - A Review block lists only what is worth a look. It does not change the plan.
+  A script or effect cut that leaves the shared box is listed with how much
+  the line box would have moved if that file had stayed.
+- A script is an outline at least twice the em and heavier below the baseline.
+  A face that only just crosses that line stays in the core.
 
 ### Removed
 - `springy`, and the grouping commands `individual`, `family`, and
   `superfamily`. There is one command.
-- The specialist flags: `--assume`, `--merge`, `--ignore-term`,
+- The specialist flags: `--assume`, `--ignore-term`,
   `--exclude`, `--measure-only`, `--line-box`, `--line-box-from`,
   `--letter-height`, `--top-margin`, and `--max-adjustment`.
 
@@ -27,6 +31,8 @@ The command groups by family name and writes one centered line box.
 - `--line-gap` adds space between lines as a percent of the em (default 0).
 - `--no-cluster` skips the centered plan and sets one box from the
   family's outline extremes so nothing clips. Formerly `--safe-max`.
+- `--match` pairs families whose names do not already group, so they
+  share one line box. Formerly `--merge`. The old spelling still parses.
 
 ## [3.2.2] - 2026-09-21
 

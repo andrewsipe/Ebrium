@@ -67,6 +67,17 @@ class OpticalSizeTest(unittest.TestCase):
         self.assertEqual(len(expanded["Source Serif 4 · Text"]), 1)
         self.assertEqual(len(expanded["Source Serif 4 · Caption"]), 1)
 
+    def test_matched_family_names_stay_one_box(self) -> None:
+        group = [
+            _fm("/tmp/FamilyA-Caption.otf", "Family A"),
+            _fm("/tmp/FamilyB-Display.otf", "Family B"),
+        ]
+        expanded = expand_optical_size_groups(
+            {"Family A": group}, [["Family A", "Family B"]]
+        )
+        self.assertEqual(list(expanded), ["Family A"])
+        self.assertEqual(len(expanded["Family A"]), 2)
+
 
 if __name__ == "__main__":
     unittest.main()

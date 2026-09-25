@@ -2,10 +2,9 @@
 
 import hashlib
 import json
-import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Optional
 
 import FontCore.core_console_styles as cs
 from FontCore.core_console_styles import get_console
@@ -29,19 +28,16 @@ def compute_config_hash(config: MetricsConfig) -> str:
         f"{config.unicase_threshold}:"
         f"{config.script_span_threshold}:"
         f"{config.script_asymmetry_ratio}:"
-        f"{config.max_span_ratio}:"
-        f"{int(config.force_baseline)}:"
-        f"{int(config.force_baseline_main_cluster_only)}:"
-        f"{getattr(config, 'force_baseline_from_pattern', '') or ''}"
+        f"{config.max_span_ratio}"
     )
     return hashlib.md5(config_str.encode()).hexdigest()[:8]
 
 
 def save_measurements_checkpoint(
-    measures: List[FontMeasures],
+    measures: list[FontMeasures],
     checkpoint_path: Path,
     config: Optional[MetricsConfig] = None,
-    clusters: Optional[Dict[str, Dict[str, List[str]]]] = None,
+    clusters: Optional[dict[str, dict[str, list[str]]]] = None,
 ) -> None:
     """Save font measurements to checkpoint file (JSON format).
 
@@ -104,9 +100,9 @@ def save_measurements_checkpoint(
 
 def load_measurements_checkpoint(
     checkpoint_path: Path,
-    expected_files: Optional[List[str]] = None,
+    expected_files: Optional[list[str]] = None,
     config: Optional[MetricsConfig] = None,
-) -> Tuple[List[FontMeasures], List[str], Optional[Dict[str, Dict[str, List[str]]]]]:
+) -> tuple[list[FontMeasures], list[str], Optional[dict[str, dict[str, list[str]]]]]:
     """Load font measurements from checkpoint file.
 
     Returns:
@@ -139,7 +135,7 @@ def load_measurements_checkpoint(
                 cached_clusters = checkpoint_data.get("clusters")
             # If hash doesn't match, clusters are invalid (config changed)
 
-        loaded_measures: List[FontMeasures] = []
+        loaded_measures: list[FontMeasures] = []
         checkpoint_paths = {m["path"] for m in checkpoint_data.get("measures", [])}
 
         # Reconstruct FontMeasures objects

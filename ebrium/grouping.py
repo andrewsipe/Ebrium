@@ -1,148 +1,67 @@
-"""Family grouping functions for organizing fonts into families/superfamilies."""
+"""Family grouping."""
 
-import sys
-from pathlib import Path
-from typing import List, Optional
 
 import FontCore.core_console_styles as cs
 from FontCore.core_console_styles import get_console
 from FontCore.core_font_sorter import FontSorter, FontInfo
 
-from . import models
-
 console = get_console()
-FontMeasures = models.FontMeasures
 
 
-# collect_groups removed - logic moved to cli.py
+def parse_matched_groups(args) -> list[list[str]]:
+    """Family names from --match. Each flag is one group that shares a line box."""
+    matched: list[list[str]] = []
+    for group_str in getattr(args, "combine", None) or []:
+        names = [name.strip() for name in group_str.split(",") if name.strip()]
+        if len(names) < 2:
+            cs.StatusIndicator("warning").add_message(
+                f'--match needs at least two family names in one flag, skipping "{group_str}". '
+                "Each --match is its own pair: -m A -m B does not match A with B."
+            ).emit(console)
+            continue
+        matched.append(names)
+    return matched
 
 
-def expand_comma_separated_args(arg_list: Optional[List[str]]) -> List[str]:
-    """Expand comma-separated values in argument list.
-
-    Supports both formats:
-      --flag "a,b,c"  ->  ['a', 'b', 'c']
-      --flag a --flag b --flag c  ->  ['a', 'b', 'c']
-      --flag "a,b" --flag c  ->  ['a', 'b', 'c']
-    """
-    if not arg_list:
-        return []
-
-    expanded = []
-    for item in arg_list:
-        # Split by comma and strip whitespace
-        expanded.extend(term.strip() for term in item.split(",") if term.strip())
-    return expanded
+def _announce_matches(groups_before_keys, groups, forced_groups) -> None:
+    """Say which family names actually landed in one group."""
+    if not forced_groups:
+        return
+    present = set(groups_before_keys)
+    lines = []
+    for names in forced_groups:
+        found = [name for name in names if name in present]
+        if len(found) < 2:
+            continue
+        target = next((name for name in found if name in groups), found[0])
+        others = [name for name in found if name != target]
+        lines.append(f"Matched [field]{target}[/field] with {', '.join(others)}")
+    if not lines:
+        return
+    cs.emit("", console=console)
+    for line in lines:
+        cs.StatusIndicator("info").add_message(line).emit(console)
 
 
 def group_families(args, measures, forced_groups):
-    """Group fonts by family or superfamily based on args.grouping_mode.
+    """Group fonts by family name.
 
-    Args:
-        args: Parsed command-line arguments (must have grouping_mode attribute)
-        measures: List of FontMeasures
-        forced_groups: List of forced group merges from --merge
-
-    Returns:
-        Dict mapping group name to list of FontMeasures
+    ``--no-cluster`` uses the same groups. ``--match`` joins family names
+    that should share one line box.
     """
-    # Individual mode: each font is its own group
-    if args.grouping_mode == "individual":
-        cs.StatusIndicator("info").add_message(
-            f"Processing {cs.fmt_count(len(measures))} font(s) individually (no grouping, no clustering)"
-        ).emit(console)
-        return {Path(fm.path).stem: [fm] for fm in measures}
+    font_infos = [
+        FontInfo(path=fm.path, family_name=fm.family_name) for fm in measures
+    ]
+    sorter = FontSorter(font_infos)
+    before = sorter.group_by_family()
+    groups = sorter.apply_forced_groups(before, forced_groups or [])
 
-    # Collect ignore_terms for both family and superfamily modes
-    ignore_terms_set = set(
-        expand_comma_separated_args(getattr(args, "ignore_term", None) or [])
-    )
-
-    # Conservative mode: family grouping only (no modifiers apply)
-    if args.grouping_mode == "conservative":
-        font_infos = [
-            FontInfo(path=fm.path, family_name=fm.family_name) for fm in measures
-        ]
-        sorter = FontSorter(font_infos, ignore_terms=ignore_terms_set)
-        groups = sorter.group_by_family(forced_groups=forced_groups)
-
-        cs.StatusIndicator("info").add_message(
-            f"Found {cs.fmt_count(len(groups))} family group(s) (--no-cluster, no clustering)"
-        ).emit(console)
-
-        if forced_groups:
-            cs.emit("", console=console)
-            forced_info = sorter.get_forced_groups_info(forced_groups, "family")
-            for info in forced_info:
-                cs.StatusIndicator("info").add_message(
-                    f"Forced family merge: [field]{info['group_name']}[/field] "
-                    f"← {', '.join(info['merged_families'])}"
-                ).emit(console)
-
-        path_to_measure = {fm.path: fm for fm in measures}
-        return {
-            group_name: [path_to_measure[fi.path] for fi in infos]
-            for group_name, infos in groups.items()
-        }
-
-    # Family or Superfamily mode
-    font_infos = [FontInfo(path=fm.path, family_name=fm.family_name) for fm in measures]
-    # Pass ignore_terms to constructor (works for both family and superfamily)
-    sorter = FontSorter(font_infos, ignore_terms=ignore_terms_set)
-
-    # Show normalization mapping if ignore_terms is active and verbose
-    verbosity = getattr(args, "verbose", 0)
-    if ignore_terms_set and verbosity >= 1:
-        normalization_summary = sorter.get_normalization_summary()
-        if normalization_summary:
-            cs.emit("", console=console)
-            cs.StatusIndicator("info").add_message(
-                "Family name normalization (ignored terms removed):"
-            ).emit(console)
-            for original, normalized in sorted(normalization_summary.items()):
-                cs.emit(
-                    f"  {original} → {normalized}",
-                    console=console,
-                )
-
-    if args.grouping_mode == "superfamily":
-        # Superfamily mode: apply exclude modifiers (ignore-term handled in constructor)
-        groups = sorter.group_by_superfamily(
-            exclude_families=expand_comma_separated_args(
-                getattr(args, "exclude", None) or []
-            ),
-            forced_groups=forced_groups,
-        )
-        cs.StatusIndicator("info").add_message(
-            f"Found {cs.fmt_count(len(groups))} superfamily group(s)"
-        ).emit(console)
-        sorter.get_superfamily_summary(groups)
-
-        if forced_groups:
-            cs.emit("", console=console)
-            forced_info = sorter.get_forced_groups_info(forced_groups, "superfamily")
-            for info in forced_info:
-                cs.StatusIndicator("info").add_message(
-                    f"Forced superfamily merge: [field]{info['group_name']}[/field] "
-                    f"← {', '.join(info['merged_families'])}"
-                ).emit(console)
-
-    else:  # args.grouping_mode == "family" (default)
-        # Family mode: only apply forced groups (combine)
-        # ignore_terms is automatically applied via constructor
-        groups = sorter.group_by_family(forced_groups=forced_groups)
-        cs.StatusIndicator("info").add_message(
-            f"Found {cs.fmt_count(len(groups))} family group(s)"
-        ).emit(console)
-
-        if forced_groups:
-            cs.emit("", console=console)
-            forced_info = sorter.get_forced_groups_info(forced_groups, "family")
-            for info in forced_info:
-                cs.StatusIndicator("info").add_message(
-                    f"Forced family merge: [field]{info['group_name']}[/field] "
-                    f"← {', '.join(info['merged_families'])}"
-                ).emit(console)
+    if getattr(args, "grouping_mode", "family") == "conservative":
+        label = f"Found {cs.fmt_count(len(groups))} family group(s) (--no-cluster, no clustering)"
+    else:
+        label = f"Found {cs.fmt_count(len(groups))} family group(s)"
+    cs.StatusIndicator("info").add_message(label).emit(console)
+    _announce_matches(before, groups, forced_groups)
 
     path_to_measure = {fm.path: fm for fm in measures}
     return {

@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Dict, List, Optional, Sequence, Tuple
+from typing import TYPE_CHECKING, Optional
+from collections.abc import Sequence
 
 if TYPE_CHECKING:
     from fontTools.ttLib import TTFont
@@ -18,7 +19,7 @@ def _get_upm(font: TTFont) -> int:
     return int(font["head"].unitsPerEm)
 
 
-def _get_best_cmap(font: TTFont) -> Dict[int, str]:
+def _get_best_cmap(font: TTFont) -> dict[int, str]:
     try:
         cmap = font.getBestCmap()
         if cmap:
@@ -26,7 +27,7 @@ def _get_best_cmap(font: TTFont) -> Dict[int, str]:
     except Exception:
         pass
     # fallback: merge all subtables
-    mapping: Dict[int, str] = {}
+    mapping: dict[int, str] = {}
     try:
         for st in font["cmap"].tables:
             if getattr(st, "cmap", None):
@@ -38,7 +39,7 @@ def _get_best_cmap(font: TTFont) -> Dict[int, str]:
 
 def _glyph_bounds(
     font: TTFont, glyph_name: str
-) -> Optional[Tuple[float, float, float, float]]:
+) -> Optional[tuple[float, float, float, float]]:
     try:
         glyph_set = font.getGlyphSet()
         if glyph_name not in glyph_set:
@@ -57,7 +58,7 @@ def _glyph_bounds(
 
 def _codepoint_bounds(
     font: TTFont, codepoint: int
-) -> Optional[Tuple[float, float, float, float]]:
+) -> Optional[tuple[float, float, float, float]]:
     cmap = _get_best_cmap(font)
     name = cmap.get(codepoint)
     if not name:
@@ -65,7 +66,7 @@ def _codepoint_bounds(
     return _glyph_bounds(font, name)
 
 
-def _font_cmap_glyph_names(font: TTFont) -> List[str]:
+def _font_cmap_glyph_names(font: TTFont) -> list[str]:
     try:
         cmap = _get_best_cmap(font)
         names = list({name for name in cmap.values() if isinstance(name, str)})
@@ -82,14 +83,14 @@ def _font_cmap_glyph_names(font: TTFont) -> List[str]:
 
 def _glyph_advance_widths(
     font: TTFont, codepoints: Sequence[int]
-) -> Dict[int, int]:
+) -> dict[int, int]:
     """Get advance widths for specified codepoints from the hmtx table."""
     cmap = _get_best_cmap(font)
     hmtx = font.get("hmtx")
     if not hmtx:
         return {}
     metrics = hmtx.metrics
-    result: Dict[int, int] = {}
+    result: dict[int, int] = {}
     for cp in codepoints:
         glyph_name = cmap.get(cp)
         if glyph_name and glyph_name in metrics:
@@ -98,7 +99,7 @@ def _glyph_advance_widths(
     return result
 
 
-def _font_overall_bounds(font: TTFont) -> Optional[Tuple[float, float]]:
+def _font_overall_bounds(font: TTFont) -> Optional[tuple[float, float]]:
     names = _font_cmap_glyph_names(font)
     if not names:
         return None

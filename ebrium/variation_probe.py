@@ -16,10 +16,9 @@ import csv
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, Iterable, List, Mapping, Optional, Sequence, TextIO, Tuple
+from typing import Optional, TextIO
+from collections.abc import Mapping, Sequence
 
-import FontCore.core_console_styles as cs
-from FontCore.core_console_styles import get_console
 from fontTools.misc.fixedTools import floatToFixedToFloat
 from fontTools.misc.roundTools import otRound
 from fontTools.ttLib import TTFont
@@ -37,7 +36,7 @@ MEASURE_TAGS = ("xhgt", "cpht")
 
 def normalized_variation_location(
     varfont: TTFont, location_user: Mapping[str, float]
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """Normalize user-space coordinates (−1..1-ish) applying avar then F2Dot14 quantization."""
     fvar = varfont["fvar"]
     axes = {a.axisTag: (a.minValue, a.defaultValue, a.maxValue) for a in fvar.axes}
@@ -54,11 +53,11 @@ def _ascii_tag(tag: object) -> str:
     return str(tag)
 
 
-def axis_pole_user_locations(varfont: TTFont) -> List[Tuple[str, Dict[str, float]]]:
+def axis_pole_user_locations(varfont: TTFont) -> list[tuple[str, dict[str, float]]]:
     """Default + each axis pinned to min or max while others stay at fvar defaults."""
     fvar = varfont["fvar"]
     defaults = {a.axisTag: float(a.defaultValue) for a in fvar.axes}
-    out: List[Tuple[str, Dict[str, float]]] = [
+    out: list[tuple[str, dict[str, float]]] = [
         ("default (axis default values)", dict(defaults))
     ]
     for a in fvar.axes:
@@ -72,11 +71,11 @@ def axis_pole_user_locations(varfont: TTFont) -> List[Tuple[str, Dict[str, float
     return out
 
 
-def mvar_delta_map(varfont: TTFont, loc_norm: Dict[str, float]) -> Dict[str, int]:
+def mvar_delta_map(varfont: TTFont, loc_norm: dict[str, float]) -> dict[str, int]:
     """Rounded MVAR deltas at a normalized location (0 at defaults)."""
     mvar_tbl = varfont["MVAR"].table
     inst = VarStoreInstancer(mvar_tbl.VarStore, varfont["fvar"].axes, loc_norm)
-    out: Dict[str, int] = {}
+    out: dict[str, int] = {}
     for rec in mvar_tbl.ValueRecord:
         tag = _ascii_tag(rec.ValueTag)
         vidx = rec.VarIdx
@@ -89,11 +88,11 @@ def mvar_delta_map(varfont: TTFont, loc_norm: Dict[str, float]) -> Dict[str, int
 
 
 def mvar_aggregate_ranges(
-    varfont: TTFont, samples: Sequence[Tuple[str, Dict[str, float]]]
-) -> Tuple[Dict[str, Tuple[int, int]], Dict[str, str]]:
+    varfont: TTFont, samples: Sequence[tuple[str, dict[str, float]]]
+) -> tuple[dict[str, tuple[int, int]], dict[str, str]]:
     """Per tag: (min_delta, max_delta) across samples; unknown tags tracked separately."""
-    per_tag_vals: Dict[str, List[int]] = {}
-    unknown_tags: Dict[str, str] = {}
+    per_tag_vals: dict[str, list[int]] = {}
+    unknown_tags: dict[str, str] = {}
 
     for _label, user_loc in samples:
         ln = normalized_variation_location(varfont, user_loc)
@@ -103,14 +102,14 @@ def mvar_aggregate_ranges(
             if tag not in MVAR_ENTRIES:
                 unknown_tags.setdefault(tag, "no OpenType registry mapping in FontTools")
 
-    ranges: Dict[str, Tuple[int, int]] = {}
+    ranges: dict[str, tuple[int, int]] = {}
     for tag, vals in per_tag_vals.items():
         ranges[tag] = (min(vals), max(vals))
     return ranges, unknown_tags
 
 
-def _moving(ranges: Mapping[str, Tuple[int, int]], tags: Sequence[str]) -> List[Tuple[str, int, int]]:
-    found: List[Tuple[str, int, int]] = []
+def _moving(ranges: Mapping[str, tuple[int, int]], tags: Sequence[str]) -> list[tuple[str, int, int]]:
+    found: list[tuple[str, int, int]] = []
     for tag in tags:
         span = ranges.get(tag)
         if span is None or (span[0] == 0 and span[1] == 0):
@@ -119,11 +118,11 @@ def _moving(ranges: Mapping[str, Tuple[int, int]], tags: Sequence[str]) -> List[
     return found
 
 
-def _span_text(moving: Sequence[Tuple[str, int, int]]) -> str:
+def _span_text(moving: Sequence[tuple[str, int, int]]) -> str:
     return ", ".join(f"{tag} {lo:+d} to {hi:+d}" for tag, lo, hi in moving)
 
 
-def _cmap_names(font: TTFont) -> List[str]:
+def _cmap_names(font: TTFont) -> list[str]:
     cmap = font.getBestCmap() or {}
     names = [name for name in cmap.values() if isinstance(name, str)]
     if names:
@@ -133,7 +132,7 @@ def _cmap_names(font: TTFont) -> List[str]:
 
 def instance_y_bounds(
     font: TTFont, user_location: Mapping[str, float]
-) -> Optional[Tuple[int, int]]:
+) -> Optional[tuple[int, int]]:
     """Cmap glyph ink at one user-space location: (yMin, yMax)."""
     try:
         glyph_set = font.getGlyphSet(location=dict(user_location))
@@ -184,10 +183,10 @@ class Survey:
     line_box_text: str = ""
     clipping_text: str = ""
     upm: int = 0
-    overflows: List[PoleOverflow] = field(default_factory=list)
-    overflow_lines: List[str] = field(default_factory=list)
-    verbose_lines: List[str] = field(default_factory=list)
-    axes: List[Tuple[str, float, float, float]] = field(default_factory=list)
+    overflows: list[PoleOverflow] = field(default_factory=list)
+    overflow_lines: list[str] = field(default_factory=list)
+    verbose_lines: list[str] = field(default_factory=list)
+    axes: list[tuple[str, float, float, float]] = field(default_factory=list)
     default_top: Optional[int] = None
     default_bottom: Optional[int] = None
     win_above: Optional[int] = None
@@ -196,11 +195,11 @@ class Survey:
 
 
 def _past_default(
-    pole: Tuple[int, int],
-    default: Tuple[int, int],
+    pole: tuple[int, int],
+    default: tuple[int, int],
     win_asc: int,
     win_desc: int,
-) -> Tuple[int, int]:
+) -> tuple[int, int]:
     """How far a pole sticks out past both the Win box and the default ink."""
     dmin, dmax = default
     pmin, pmax = pole
@@ -210,7 +209,7 @@ def _past_default(
 
 
 def _units_phrase(above: int, below: int) -> str:
-    parts: List[str] = []
+    parts: list[str] = []
     if above > 0:
         parts.append(f"{above} above")
     if below > 0:
@@ -236,8 +235,8 @@ def survey_font(font: TTFont) -> Survey:
         f"{tag} {lo:g}…{default:g}…{hi:g}" for tag, lo, default, hi in axes
     )
     samples = axis_pole_user_locations(font)
-    ranges: Dict[str, Tuple[int, int]] = {}
-    unknown: Dict[str, str] = {}
+    ranges: dict[str, tuple[int, int]] = {}
+    unknown: dict[str, str] = {}
     if "MVAR" in font:
         ranges, unknown = mvar_aggregate_ranges(font, samples)
 
@@ -259,7 +258,7 @@ def survey_font(font: TTFont) -> Survey:
         line_box_text = "flat"
 
     clip_moving = _moving(ranges, CLIP_TAGS)
-    verbose_lines: List[str] = []
+    verbose_lines: list[str] = []
     mvar_records = (
         len(font["MVAR"].table.ValueRecord) if "MVAR" in font else None
     )
@@ -294,7 +293,7 @@ def survey_font(font: TTFont) -> Survey:
             verbose_lines=verbose_lines,
         )
 
-    overflows: List[PoleOverflow] = []
+    overflows: list[PoleOverflow] = []
     for label, user_loc in samples[1:]:
         bounds = instance_y_bounds(font, user_loc)
         if bounds is None:
@@ -435,9 +434,9 @@ def _axis_sentence(tag: str, lo: float, default: float, hi: float) -> str:
     return f"{title} runs from {lo:g} to {hi:g}. The default style sits at {default:g}."
 
 
-def explain_survey(survey: Survey) -> List[str]:
+def explain_survey(survey: Survey) -> list[str]:
     """Sentences for -vv. Each number says what it measures."""
-    lines: List[str] = []
+    lines: list[str] = []
     if survey.clipping == "static":
         lines.append("This file has no sliders. There is nothing variable to check.")
         return lines
@@ -533,12 +532,6 @@ def metrics_brief(survey: Survey) -> str:
     return f"Em {survey.upm}. {spacing} {outlines} {box} {ends}"
 
 
-def _status_for(survey: Survey) -> str:
-    if survey.clipping in ("error", "unmeasured"):
-        return "error" if survey.clipping == "error" else "info"
-    return "unchanged"
-
-
 REPORT_COLUMNS = (
     "path",
     "em",
@@ -564,7 +557,7 @@ def load_survey(path: str) -> Survey:
         font.close()
 
 
-def report_row(path: str, survey: Survey) -> List[str]:
+def report_row(path: str, survey: Survey) -> list[str]:
     sliders = " ".join(_axis_sentence(*axis) for axis in survey.axes)
     if survey.line_box == "moves":
         spacing = "changes with the sliders"
@@ -600,7 +593,7 @@ def probe_root(source_paths: Sequence[str]) -> Path:
     """Directory a relative report belongs in: the folder that was probed."""
     if not source_paths:
         return Path.cwd()
-    roots: List[Path] = []
+    roots: list[Path] = []
     for raw in source_paths:
         path = Path(raw).expanduser().resolve()
         roots.append(path if path.is_dir() else path.parent)
@@ -620,107 +613,10 @@ def report_destination(output: str, source_paths: Sequence[str]) -> str:
     return str(probe_root(source_paths) / path)
 
 
-def open_report(path: str) -> Tuple[TextIO, csv.writer]:
+def open_report(path: str) -> tuple[TextIO, csv.writer]:
     """Create a tab-separated report and write the header. Caller closes the file."""
     handle = open(path, "w", newline="", encoding="utf-8")
     writer = csv.writer(handle, delimiter="\t", lineterminator="\n")
     writer.writerow(REPORT_COLUMNS)
     handle.flush()
     return handle, writer
-
-
-def _emit_survey(path: str, survey: Survey, verbose: int) -> None:
-    """Print the metrics. -vv adds the longer description of the same numbers."""
-    console = get_console()
-    fp = Path(path)
-    if survey.clipping == "error" and not survey.axes_line:
-        cs.StatusIndicator("error").add_file(str(fp), filename_only=False).with_explanation(
-            survey.clipping_text
-        ).emit(console)
-        return
-    ind = (
-        cs.StatusIndicator(_status_for(survey))
-        .add_file(str(fp), filename_only=False)
-        .add_message(metrics_brief(survey))
-    )
-    if verbose >= 1:
-        for line in survey.overflow_lines:
-            ind.add_item(line, indent_level=1)
-    if verbose >= 2:
-        for line in explain_survey(survey):
-            ind.add_item(line, indent_level=1)
-    ind.emit(console)
-
-
-def probe_font_file(path: str, verbose: int = 0) -> Survey:
-    """Print one font. ``verbose`` is 0, 1 (-v), or 2+ (-vv)."""
-    survey = load_survey(path)
-    _emit_survey(path, survey, verbose)
-    return survey
-
-
-def _progress_label(path: str) -> str:
-    name = Path(path).name.replace("[", "(").replace("]", ")")
-    return f"Probing {name}"
-
-
-def run_probe(
-    paths: Iterable[str],
-    verbose: int = 0,
-    quiet: bool = False,
-    output: Optional[str] = None,
-    source_paths: Optional[Sequence[str]] = None,
-) -> None:
-    """Probe every path, then print a tally. ``output`` is a TSV written as we go."""
-    console = get_console()
-    lst = list(paths)
-    if not lst:
-        cs.StatusIndicator("error").add_message("No font files to probe").emit(console)
-        return
-    if quiet and verbose:
-        cs.StatusIndicator("error").add_message(
-            "--quiet and --verbose cannot be combined"
-        ).emit(console)
-        raise SystemExit(2)
-
-    report_handle: Optional[TextIO] = None
-    report_writer: Optional[csv.writer] = None
-    if output:
-        output = report_destination(output, list(source_paths or []))
-        try:
-            report_handle, report_writer = open_report(output)
-        except OSError as e:
-            cs.StatusIndicator("error").add_message(
-                f"Could not write {output}: {e}"
-            ).emit(console)
-            raise SystemExit(2)
-    elif quiet:
-        cs.StatusIndicator("warning").add_message(
-            "Quiet mode omits per-font lines. Pass -o FILE to keep them."
-        ).emit(console)
-
-    def _record(path: str, survey: Survey) -> None:
-        if report_writer is not None and report_handle is not None:
-            report_writer.writerow(report_row(path, survey))
-            report_handle.flush()
-
-    try:
-        if quiet:
-            with cs.create_progress_bar(console) as progress:
-                task = progress.add_task("Probing", total=len(lst))
-                for path in lst:
-                    progress.update(task, description=_progress_label(path))
-                    _record(path, load_survey(path))
-                    progress.advance(task)
-        else:
-            for path in lst:
-                _record(path, probe_font_file(path, verbose=verbose))
-    finally:
-        if report_handle is not None:
-            report_handle.close()
-
-    cs.emit("", console=console)
-    summary = f"Probe: {len(lst)} font(s)."
-    if output:
-        summary += f" Report: {output}."
-    cs.StatusIndicator("info").add_message(summary).emit(console)
