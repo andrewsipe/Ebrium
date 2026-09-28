@@ -589,12 +589,7 @@ td code {
   display: grid;
   gap: 0.75rem;
   margin: 1rem 0 1.25rem;
-}
-
-@media (min-width: 700px) {
-  .modes {
-    grid-template-columns: 1fr 1fr;
-  }
+  min-width: 0;
 }
 
 .mode {
@@ -628,12 +623,15 @@ td code {
 
 .specimen-stage {
   display: block;
+  width: 100%;
+  min-width: 0;
   height: auto;
   padding: 0.7rem 0.75rem;
 }
 
 .specimen-stage img {
   width: 100%;
+  max-width: 100%;
   height: auto;
   display: block;
 }
