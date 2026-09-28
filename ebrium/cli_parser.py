@@ -176,6 +176,7 @@ def build_parser() -> argparse.ArgumentParser:
         "The family name is the group. --match is how two names share that box.",
         "--no-cluster skips that plan. The family shares one box set to its outline extremes, so nothing clips.",
         '--match "Family A,Family B" pairs families whose names do not already group, so they share one line box. '
+        "A filename form matches the same name: FamilyShort is Family Short. "
         "Repeat the flag for another pair. Each flag is its own pair.",
         "--span is the letter-span floor, as a percent of the em (default 130). "
         "120 is tighter, 150 is looser. A measured descender can still lower it.",

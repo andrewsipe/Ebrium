@@ -6,7 +6,7 @@
   <title>Concepts · ebrium</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Great+Vibes&family=IBM+Plex+Mono:wght@400;500&family=Kablammo&family=Mozilla+Headline:wght@200;700&family=Sora:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=Unica+One&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Sora:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -111,55 +111,43 @@
     <h2>Shared box</h2>
     <p>A run gives the core styles in a family one line box. <code>--match "Family A,Family B"</code> puts two families that do not already share a name onto that same box. <code>probe</code> shows how far each file’s stored ascender would move to match it. <code>--no-cluster</code> replaces that plan with one box from the family’s outline extremes.</p>
 
-    <h2 id="assume">Detection labels</h2>
-    <p>The program marks a face as script, a layer or swash, unicase, or uniwidth from the outlines. A file whose name says unicase, and whose outlines did not, is still treated as unicase. You do not pass a flag for that. In the pictures, the solid box is the shared line box and the dashed box is the clipping box.</p>
+    <h2 id="assume">What the outlines decide</h2>
+    <p>The dashed edge is the span. The teal line is the baseline.</p>
     <div class="modes">
       <article class="mode">
         <p class="meta">script</p>
-        <h3>Swashes fall past the shared box</h3>
-        <div class="stage script-stage" aria-hidden="true">
-          <div class="clip"></div>
-          <div class="shared"></div>
-          <span class="word">Playfully</span>
-          <i class="bl"></i>
+        <h3>Calligraphy</h3>
+        <div class="stage specimen-stage">
+          <img src="script.svg" alt="A script word inside the span, sitting on the baseline." />
         </div>
-        <p class="what">A script is an outline about twice the em, and heavier below the baseline. A face that only just reaches that stays with the core. When a script does leave, it keeps the family’s line box, and the clipping box grows around the swashes. The review says how much the line box would have moved if it had stayed.</p>
+        <p class="what">The swashes cross the span. The word sits on the baseline.</p>
       </article>
       <article class="mode">
-        <p class="meta">decorative</p>
-        <h3>The outline is taller than the text</h3>
-        <div class="stage deco-stage" aria-hidden="true">
-          <div class="clip"></div>
-          <div class="shared"></div>
-          <span class="word">Decorative</span>
-          <i class="bl"></i>
+        <p class="meta">layer</p>
+        <h3>The shadow crosses the span</h3>
+        <div class="stage specimen-stage">
+          <img src="decorative.svg" alt="A layered word. The face sits in the span and the shadow crosses it." />
         </div>
-        <p class="what">A style whose cap still matches a sibling, but whose ink runs at least 10% of the em past that sibling, keeps the family’s line box. The extra ink may clip. The style name is not used.</p>
+        <p class="what">The face and the shadow share the span and the baseline. The shadow crosses the edge, and that ink may clip.</p>
+      </article>
+      <article class="mode">
+        <p class="meta">height</p>
+        <h3>Short and tall, one baseline</h3>
+        <div class="stage specimen-stage">
+          <img src="varied-height.svg" alt="Three capitals of different heights inside one span, on one baseline. A teal line marks each cap." />
+        </div>
+        <p class="what">One span, one baseline. The shorter teal lines mark each capital, so the shorter letters keep the tall one’s span.</p>
       </article>
       <article class="mode">
         <p class="meta">unicase</p>
-        <h3>Same centered box</h3>
-        <div class="stage align-stage" aria-hidden="true">
-          <div class="pair">
-            <span class="face">Hx</span>
-            <span class="uni">Hx</span>
-            <span class="xlab">x-height</span>
-          </div>
+        <h3>Cap against x-height</h3>
+        <div class="stage specimen-stage">
+          <img src="unicase.svg" alt="A unicase capital and a text capital inside one span. Teal lines mark the cap and the x-height." />
         </div>
-        <p class="what">A unicase family gets the same centered box as a text family with the same cap height. The shorter seed above the letters is usually absorbed by the span floor.</p>
-      </article>
-      <article class="mode">
-        <p class="meta">uniwidth</p>
-        <h3>Bold occupies the same width</h3>
-        <div class="stage width-stage" aria-hidden="true">
-          <div class="widths">
-            <span class="w400">Handgloves</span>
-            <span class="w800">Handgloves</span>
-          </div>
-        </div>
-        <p class="what">The weights already share their widths, so a weight change does not reflow the line. The family still gets one line box.</p>
+        <p class="what">One is unicase and one is not. The upper lines mark the cap and the x-height. Both sit on the baseline and share the span.</p>
       </article>
     </div>
+    <p>If the outlines miss a unicase and the name says unicase, the name is the fallback.</p>
 
     <h2>Family name</h2>
     <p>One family name is one line box. Caption, Display, and Subhead do not split it. A variable font stays with its own family name, separate from the statics. <code>--match</code> is how you pair names that should share a box anyway.</p>

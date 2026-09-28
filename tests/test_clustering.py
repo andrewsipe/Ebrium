@@ -53,10 +53,10 @@ class EffectMembershipTest(unittest.TestCase):
         self.assertEqual(len(clusters[0]), 2)
 
     def test_extra_ink_keeps_the_base_box(self) -> None:
-        base = _fm("Discovery-Black")
+        base = _fm("Layer-Base")
         base.min_y = -480
         base.max_y = 1600
-        layer = _fm("Discovery-BlackOverlay")
+        layer = _fm("Layer-Overlay")
         layer.cap_optical = 740
         layer.min_y = -1080
         layer.max_y = 1680
@@ -66,26 +66,26 @@ class EffectMembershipTest(unittest.TestCase):
         swash.max_y = 1800
         _, peeled = peel_effect_outliers([base, layer, swash], MetricsConfig())
         names = {Path(fm.path).stem for fm in peeled}
-        self.assertEqual(names, {"Discovery-BlackOverlay", "Script-Alternate"})
+        self.assertEqual(names, {"Layer-Overlay", "Script-Alternate"})
         self.assertTrue(all(fm.clip_with_family for fm in peeled))
 
     def test_a_name_does_not_make_a_companion(self) -> None:
-        group = [_fm("SpaceGrotesk-Regular"), _fm("SpaceMono-Bold")]
+        group = [_fm("FamilyA-Regular"), _fm("FamilyB-Bold")]
         _, peeled = peel_effect_outliers(group, MetricsConfig())
         self.assertEqual(peeled, [])
 
     def test_a_taller_cap_is_not_extra_ink(self) -> None:
-        short = _fm("Reel-Short")
-        tall = _fm("Reel-Tall")
+        short = _fm("Height-Short")
+        tall = _fm("Height-Tall")
         tall.cap_optical = 1225
         tall.min_y = -900
         _, peeled = peel_effect_outliers([short, tall], MetricsConfig())
         self.assertEqual(peeled, [])
 
     def test_a_small_descender_change_stays(self) -> None:
-        regular = _fm("Salina-Regular")
+        regular = _fm("Text-Regular")
         regular.min_y = -242
-        bold = _fm("Salina-Black")
+        bold = _fm("Text-Black")
         bold.min_y = -272
         _, peeled = peel_effect_outliers([regular, bold], MetricsConfig())
         self.assertEqual(peeled, [])

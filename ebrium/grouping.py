@@ -1,11 +1,49 @@
 """Family grouping."""
 
+from __future__ import annotations
+
+import re
 
 import FontCore.core_console_styles as cs
 from FontCore.core_console_styles import get_console
 from FontCore.core_font_sorter import FontSorter, FontInfo
 
 console = get_console()
+
+
+def _compact_name(name: str) -> str:
+    """Family name with spaces and punctuation removed, for filename forms."""
+    return re.sub(r"[^0-9a-z]+", "", name.casefold())
+
+
+def resolve_matched_names(
+    groups: list[list[str]], family_names: list[str] | set[str]
+) -> tuple[list[list[str]], list[str]]:
+    """Map --match tokens onto the family names in the run.
+
+    ``FamilyShort`` matches the family ``Family Short``. A token that
+    matches more than one family is left unmatched.
+    """
+    buckets: dict[str, list[str]] = {}
+    names = list(family_names)
+    for name in names:
+        buckets.setdefault(_compact_name(name), []).append(name)
+
+    resolved: list[list[str]] = []
+    missed: list[str] = []
+    for group in groups:
+        found: list[str] = []
+        for token in group:
+            hits = buckets.get(_compact_name(token), [])
+            if len(hits) == 1:
+                if hits[0] not in found:
+                    found.append(hits[0])
+            elif token in names and token not in found:
+                found.append(token)
+            else:
+                missed.append(token)
+        resolved.append(found)
+    return resolved, missed
 
 
 def parse_matched_groups(args) -> list[list[str]]:
@@ -54,14 +92,19 @@ def group_families(args, measures, forced_groups):
     ]
     sorter = FontSorter(font_infos)
     before = sorter.group_by_family()
-    groups = sorter.apply_forced_groups(before, forced_groups or [])
+    resolved, missed = resolve_matched_names(forced_groups or [], before.keys())
+    for token in missed:
+        cs.StatusIndicator("warning").add_message(
+            f'--match "{token}" did not match a family name in this run.'
+        ).emit(console)
+    groups = sorter.apply_forced_groups(before, resolved)
 
     if getattr(args, "grouping_mode", "family") == "conservative":
         label = f"Found {cs.fmt_count(len(groups))} family group(s) (--no-cluster, no clustering)"
     else:
         label = f"Found {cs.fmt_count(len(groups))} family group(s)"
     cs.StatusIndicator("info").add_message(label).emit(console)
-    _announce_matches(before, groups, forced_groups)
+    _announce_matches(before, groups, resolved)
 
     path_to_measure = {fm.path: fm for fm in measures}
     return {

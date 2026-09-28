@@ -15,6 +15,8 @@ The command groups by family name and writes one centered line box.
   that sibling, the file keeps the base line box and the extra ink may clip.
   Style words such as Caption or Display do not split the family.
   A color font family with a color table copies one box across its files.
+  `--match` treats a filename form as the same family name: FamilyShort
+  is Family Short.
 - A Review block lists only what is worth a look. It does not change the plan.
   A script or layer that leaves the shared box is listed with how much
   the line box would have moved if that file had stayed.

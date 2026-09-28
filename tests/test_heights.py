@@ -11,7 +11,7 @@ from ebrium.planning import family_cap_anchor, plan_identical_metrics
 
 def _fm(name: str, cap: int) -> FontMeasures:
     fm = FontMeasures(f"/tmp/{name}.ttf", 1750)
-    fm.family_name = "Reel"
+    fm.family_name = "Height"
     fm.cap_height = cap
     fm.cap_optical = cap
     fm.x_height = cap
@@ -23,17 +23,17 @@ def _fm(name: str, cap: int) -> FontMeasures:
 
 class HeightFamilyTest(unittest.TestCase):
     def test_tallest_cap_is_the_anchor(self) -> None:
-        short = [_fm(f"Reel-Short{i}", 700) for i in range(5)]
-        tall = [_fm(f"Reel-Tall{i}", 1225) for i in range(5)]
+        short = [_fm(f"Height-Short{i}", 700) for i in range(5)]
+        tall = [_fm(f"Height-Tall{i}", 1225) for i in range(5)]
         anchor = family_cap_anchor(short + tall, short, MetricsConfig())
         self.assertAlmostEqual(anchor, 1225 / 1750)
 
     def test_one_height_has_no_anchor(self) -> None:
-        group = [_fm(f"Reel-{i}", 700) for i in range(4)]
+        group = [_fm(f"Height-{i}", 700) for i in range(4)]
         self.assertIsNone(family_cap_anchor(group, group, MetricsConfig()))
 
     def test_short_cluster_uses_the_tall_box(self) -> None:
-        short = [_fm("Reel-ShortA", 700), _fm("Reel-ShortB", 700)]
+        short = [_fm("Height-ShortA", 700), _fm("Height-ShortB", 700)]
         anchor = 1225 / 1750
         plan_identical_metrics(
             short, -0.2, 1.0, 0.65, MetricsConfig(), cap_anchor=anchor
