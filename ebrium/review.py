@@ -10,7 +10,6 @@ cross-weight spread, and an x-height/cap-height ratio outside the usual band.
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 from typing import Optional
 from collections.abc import Sequence
@@ -28,7 +27,6 @@ CROSS_WEIGHT_SPREAD = 0.03
 X_CAP_LOW = 0.65
 X_CAP_HIGH = 0.78
 
-_LAYER_TOKENS = frozenset({"layer", "layers", "color"})
 _COLOR_TABLES = ("COLR", "SVG ", "CBDT", "sbix")
 
 
@@ -36,29 +34,11 @@ def font_has_color_table(font) -> bool:
     return any(tag in font for tag in _COLOR_TABLES)
 
 
-def _tokens(fm: FontMeasures) -> list[str]:
-    stem = Path(fm.path).stem
-    blob = f"{fm.family_name} {stem}"
-    parts = re.split(r"[-_ ]+", blob)
-    tokens: list[str] = []
-    for part in parts:
-        tokens.extend(
-            re.findall(r"[A-Z]+(?=[A-Z][a-z])|[A-Z]?[a-z]+|[A-Z]+|\d+", part)
-        )
-    return [t.lower() for t in tokens if t]
-
-
-def _named_layer(fm: FontMeasures) -> bool:
-    return bool(_LAYER_TOKENS.intersection(_tokens(fm)))
-
-
 def is_layered_set(group: Sequence[FontMeasures]) -> bool:
-    """True when every file in a multi-file group is a color font or a named layer."""
+    """True when every file in a multi-file group has a color table."""
     if len(group) < 2:
         return False
-    if all(fm.is_color_font for fm in group):
-        return True
-    return all(_named_layer(fm) for fm in group)
+    return all(fm.is_color_font for fm in group)
 
 
 def stamp_layered_metrics(group: Sequence[FontMeasures], config: MetricsConfig) -> bool:
@@ -126,20 +106,37 @@ def _peel_notes(group: Sequence[FontMeasures], config: MetricsConfig) -> list[st
         return []
     actual_span = actual[0] + abs(actual[1])
     notes: list[str] = []
+    buckets: dict[tuple[str, str], list[str]] = {}
     for fm in peeled:
         stayed = planned_typo_norm([*core, fm], config)
         if stayed is None:
             continue
         delta = abs((stayed[0] + abs(stayed[1])) - actual_span)
-        if fm.is_script:
+        if fm.clip_with_family:
+            kind = "layer or swash"
+        elif fm.is_script:
             kind = "script"
         elif fm.is_unicase:
             kind = "unicase"
         else:
             kind = "decorative"
+        buckets.setdefault((kind, f"{delta * 100:.1f}"), []).append(Path(fm.path).name)
+    for (kind, pct), names in buckets.items():
+        if len(names) == 1:
+            notes.append(
+                f"{names[0]} left the shared box as {kind}. "
+                f"Keeping it in would have changed the line box by {pct}% of the em."
+            )
+            continue
+        if pct == "0.0":
+            notes.append(
+                f"{len(names)} styles left the shared box as {kind}. "
+                "The line box would not have changed."
+            )
+            continue
         notes.append(
-            f"{Path(fm.path).name} left the shared box as {kind}. "
-            f"Keeping it in would have changed the line box by {delta * 100:.1f}% of the em."
+            f"{len(names)} styles left the shared box as {kind}. "
+            f"Keeping one in would have changed the line box by {pct}% of the em."
         )
     return notes
 
@@ -156,9 +153,16 @@ def review_notes(
         )
 
     core = _core_fonts(group)
-    if any(fm.accented_cap_missing for fm in core):
+    tall_accent = [
+        fm
+        for fm in core
+        if fm.accented_cap_max
+        and fm.target_typo_asc
+        and fm.accented_cap_max > fm.target_typo_asc
+    ]
+    if tall_accent:
         notes.append(
-            "No accented-capital sample — re-check when extended Latin is added"
+            "Accented capitals sit past the line box. Win covers them."
         )
     if any(fm.span_exceeded_target for fm in group):
         notes.append(

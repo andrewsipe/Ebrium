@@ -43,7 +43,7 @@
         <tr><td><code>ebrium probe fonts/ -r</code></td><td>Read the metrics. Write nothing.</td></tr>
       </tbody>
     </table>
-    <p>Effect cuts inherit the family box. Caption, Display, Subhead, and Small Text each keep their own. A review at the end names anything worth a look, including how much the line box would have moved if a script or effect cut had stayed in the core. The box is 130% of the em at minimum, capitals centered, with room for a real accent or descender.</p>
+    <p>A style whose outlines pass a sibling with the same cap keeps that sibling’s box and may clip. The family name is what holds those styles on one box. <code>--match</code> pairs two names that should share it. A review at the end names anything worth a look, including an accent that sits past the line box and how much the line box would have moved if a script or layer had stayed in the core. The box is 130% of the em at minimum, capitals centered, with room above the caps. A deep descender can still lower the bottom.</p>
 
   </main>
 

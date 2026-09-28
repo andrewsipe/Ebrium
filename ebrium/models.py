@@ -40,6 +40,8 @@ class FontMeasures:
         # Clustering results (set during clustering refinement)
         self.cluster_id: Optional[int] = None
         self.is_decorative_outlier: bool = False  # Confirmed by clustering
+        # Layer or swash companion. It keeps the family's line box and may clip.
+        self.clip_with_family: bool = False
 
         # Computed targets
         self.target_typo_asc: Optional[int] = None

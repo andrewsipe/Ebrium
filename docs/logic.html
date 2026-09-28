@@ -37,11 +37,11 @@
       </li>
       <li>
         <span class="term">Separate</span>
-        Core styles set the line box. A script is an outline about twice the em and heavier below the baseline; a face that only just crosses that line stays in the core. An effect cut (Shadow, Extrude, Fine, and similar) is recognized from the file name, and only when that family also has a Face. Caption, Display, Subhead, and Small Text each get their own box. A layered or color stack copies one box across its files. <code>--no-cluster</code> skips all of that and uses the outline extremes.
+        Core styles set the line box. A script is an outline about twice the em and heavier below the baseline; a face that only just crosses that line stays in the core. A layer or swash is recognized from the outlines: the cap still matches a sibling, but the ink runs at least 10% of the em past that sibling. That file keeps the base line box, and the extra ink may clip. The style name is not used. A color font family with a color table copies one box across its files. <code>--no-cluster</code> skips all of that and uses the outline extremes.
       </li>
       <li>
         <span class="term">Plan</span>
-        Center capitals in the line box and grow to the span floor (<code>--span</code>, default 130) while staying centered. Raise a side only when a measured accent or descender needs it. The line gap is 0 unless <code>--line-gap</code> says otherwise. Win is the outline extremes plus 2%. See <a href="concepts.html">Concepts</a>.
+        Center capitals in the line box and grow to the span floor (<code>--span</code>, default 130) while staying centered. Lower the bottom only when a measured descender needs it. A tall accent stays in Win. Short and Tall under one family name share that box, centered on the tallest cap. The line gap is 0 unless <code>--line-gap</code> says otherwise. Win is the outline extremes plus 2% on the core styles. A layer or swash keeps that Win and may clip. A script can widen it. See <a href="concepts.html">Concepts</a>.
       </li>
       <li>
         <span class="term">Apply</span>

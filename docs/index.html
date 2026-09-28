@@ -30,7 +30,7 @@
     <p class="meta">Documentation · v3.2.2</p>
     <h1>Vertical metrics, family-wide</h1>
     <p class="lede">
-      ebrium normalizes typo, <a href="https://learn.microsoft.com/en-us/typography/opentype/spec/hhea">hhea</a>, and Win metrics across a family so styles share a coherent line box and don’t clip — without touching <a href="https://learn.microsoft.com/en-us/typography/opentype/spec/head#unitsPerEm"><code>unitsPerEm</code></a> or outlines.
+      ebrium normalizes typo, <a href="https://learn.microsoft.com/en-us/typography/opentype/spec/hhea">hhea</a>, and Win metrics across a family so styles share a line box — without touching <a href="https://learn.microsoft.com/en-us/typography/opentype/spec/head#unitsPerEm"><code>unitsPerEm</code></a> or outlines. Text stays inside that box. A layer or swash may clip.
     </p>
 
     <div class="callout warn">
@@ -52,7 +52,7 @@ ebrium fonts/ -r -n</code></pre>
     <div class="card-grid">
       <a class="card" href="concepts.html">
         <h2>Concepts</h2>
-        <p>Cap height, the shared line box, typo vs Win, effect cuts.</p>
+        <p>Cap height, the shared line box, typo vs Win, layers and swashes.</p>
       </a>
       <a class="card" href="terminal.html">
         <h2>Reading a run</h2>
@@ -60,7 +60,7 @@ ebrium fonts/ -r -n</code></pre>
       </a>
       <a class="card" href="logic.html">
         <h2>How it thinks</h2>
-        <p>Measure, separate the core from effect cuts, plan one centered box, then apply.</p>
+        <p>Measure, separate a layer or swash from the core, plan one centered box, then apply.</p>
       </a>
       <a class="card" href="flags.html">
         <h2>Flag reference</h2>

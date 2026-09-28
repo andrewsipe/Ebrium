@@ -11,7 +11,6 @@ from . import clustering
 from . import config
 from . import font_io
 from . import models
-from .optical_size import split_optical_size_groups
 from .review import emit_review, review_notes, stamp_layered_metrics
 
 console = get_console()
@@ -146,10 +145,8 @@ def compute_family_normalized_ascender(
 ) -> float:
     """Seed the line box from cap height plus headroom.
 
-    Tall glyphs do not raise this seed. ``plan_typo_box`` raises the box
-    for a measured accented capital or descender, and that is the only
-    place that happens. A unicase family starts with less headroom; the
-    span floor usually absorbs that.
+    Tall glyphs do not raise this seed. ``plan_typo_box`` deepens the box
+    for a measured descender. A tall accent stays in the clipping box.
     """
     cap_ratios: list[float] = []
     is_unicase_cluster = all(fm.is_unicase for fm in measures) and len(measures) > 0
@@ -182,10 +179,10 @@ def plan_typo_box(
 
     1. Seed ascender, center descender (rule 9: ``asc − cap == |desc|``).
     2. If span is under the letter-height floor, expand **while staying centered**.
-    3. Raise asc to clear accented caps; deepen desc to clear real descenders.
-       Asymmetry comes only from those measurements — not a fixed 60/40 split.
-    4. If accented samples are missing, keep the cap-plus-headroom seed and
-       flag ``accented_cap_missing`` on the FontMeasures (report-only).
+    3. Deepen the descender when a measured descender needs it. A tall accent
+       does not raise the line box. Win covers it.
+    4. If the descender floor needs more than the span target, the span is
+       allowed to exceed it.
 
     Returns ``(typo_asc, typo_desc, exceeded_target)``.
     """
@@ -205,13 +202,7 @@ def plan_typo_box(
         typo_asc = int(round((target_span + cap) / 2.0))
         desired_desc = -(typo_asc - cap)
 
-    # Measured floors — may break centering and exceed the target span.
-    if accented_cap_max is not None and accented_cap_max > typo_asc:
-        typo_asc = int(accented_cap_max)
-    elif accented_cap_missing:
-        # Nothing to measure yet; keep formula seed / centered span.
-        pass
-
+    # A deep descender can lower this side. Accents stay in Win.
     if descender_min is not None and desired_desc > descender_min:
         # descender_min is more negative when deeper
         desired_desc = int(descender_min)
@@ -221,10 +212,47 @@ def plan_typo_box(
     return typo_asc, desired_desc, exceeded
 
 
+def cap_norm(fm: FontMeasures) -> Optional[float]:
+    """Cap height as a fraction of the em."""
+    cap = fm.cap_optical or fm.cap_height
+    if cap and fm.upm > 0:
+        return cap / fm.upm
+    return None
+
+
+def family_cap_anchor(
+    group: list[FontMeasures],
+    main_cluster: list[FontMeasures],
+    config: MetricsConfig,
+) -> Optional[float]:
+    """Tallest cap in the family, when the heights are not one cluster.
+
+    Short, Normal, and Tall in one family share the tall cap's line box.
+    A single height keeps the usual plan.
+    """
+    fonts = [
+        fm
+        for fm in group
+        if fm.upm > 0
+        and not fm.is_script
+        and not (fm.is_decorative_outlier and not fm.is_unicase)
+    ] or list(main_cluster)
+    ratios = [ratio for fm in fonts if (ratio := cap_norm(fm)) is not None]
+    if len(ratios) < 2:
+        return None
+    tallest = max(ratios)
+    core = [ratio for fm in main_cluster if (ratio := cap_norm(fm)) is not None]
+    core_cap = max(core) if core else tallest
+    if tallest - core_cap <= config.optical_threshold:
+        return None
+    return tallest
+
+
 def planned_typo_norm(
     fonts: list[FontMeasures],
     config: MetricsConfig,
     norm_asc: Optional[float] = None,
+    cap_anchor: Optional[float] = None,
 ) -> Optional[tuple[float, float, bool]]:
     """Normalized typo ascender, descender, and whether the span exceeded the floor.
 
@@ -234,21 +262,24 @@ def planned_typo_norm(
     if not fonts:
         return None
 
-    cap_height_ratios: list[float] = []
-    for fm in fonts:
-        cap = fm.cap_optical or fm.cap_height
-        if cap and fm.upm > 0:
-            cap_height_ratios.append(float(cap) / float(fm.upm))
-    if not cap_height_ratios:
-        norm_cap_h = 0.7
+    if cap_anchor is not None:
+        norm_cap_h = cap_anchor
     else:
-        cap_height_ratios.sort()
-        n = len(cap_height_ratios)
-        norm_cap_h = (
-            cap_height_ratios[n // 2]
-            if n % 2 == 1
-            else (cap_height_ratios[n // 2 - 1] + cap_height_ratios[n // 2]) / 2.0
-        )
+        cap_height_ratios: list[float] = []
+        for fm in fonts:
+            ratio = cap_norm(fm)
+            if ratio is not None:
+                cap_height_ratios.append(ratio)
+        if not cap_height_ratios:
+            norm_cap_h = 0.7
+        else:
+            cap_height_ratios.sort()
+            n = len(cap_height_ratios)
+            norm_cap_h = (
+                cap_height_ratios[n // 2]
+                if n % 2 == 1
+                else (cap_height_ratios[n // 2 - 1] + cap_height_ratios[n // 2]) / 2.0
+            )
 
     accented_norms = [
         fm.accented_cap_max / fm.upm
@@ -290,6 +321,7 @@ def plan_identical_metrics(
     family_norm_asc: float,
     config: MetricsConfig,
     verbosity: Verbosity = Verbosity.BRIEF,
+    cap_anchor: Optional[float] = None,
 ) -> None:
     """Apply identical normalization to optically identical fonts.
 
@@ -298,7 +330,9 @@ def plan_identical_metrics(
     if not cluster:
         return
 
-    planned = planned_typo_norm(cluster, config, norm_asc=family_norm_asc)
+    planned = planned_typo_norm(
+        cluster, config, norm_asc=family_norm_asc, cap_anchor=cap_anchor
+    )
     if planned is None:
         return
     norm_typo_asc, norm_desired_desc, exceeded = planned
@@ -424,6 +458,7 @@ def plan_adaptive_metrics(
     family_norm_asc: float,
     config: MetricsConfig,
     verbosity: Verbosity = Verbosity.BRIEF,
+    cap_anchor: Optional[float] = None,
 ) -> None:
     """Apply per-font adaptive normalization for varied fonts."""
     for fm in cluster:
@@ -438,7 +473,10 @@ def plan_adaptive_metrics(
 
         typo_asc_seed = int(round(family_norm_asc * upm))
         cap_ref = fm.cap_optical or fm.cap_height
-        cap_h = cap_ref if cap_ref else int(round(0.7 * upm))
+        if cap_anchor is not None:
+            cap_h = int(round(cap_anchor * upm))
+        else:
+            cap_h = cap_ref if cap_ref else int(round(0.7 * upm))
         cluster_target = compute_cluster_target_percent([fm], config)
 
         typo_asc, desired_desc, exceeded = plan_typo_box(
@@ -561,30 +599,6 @@ def build_plans(
         review[name] = review_notes(fonts, config)
 
     for fam, group in families.items():
-        subgroups = split_optical_size_groups(group)
-        if len(subgroups) > 1:
-            names = ", ".join(
-                f"{label} ({cs.fmt_count(len(fonts))})" for label, fonts in subgroups
-            )
-            cs.StatusIndicator("info").add_message(
-                f"[field]Family:[/field] '{fam}' — "
-                f"[bold]Optical sizes:[/bold] unpin into {cs.fmt_count(len(subgroups))} "
-                f"line boxes — {names}"
-            ).emit(console)
-            nested = {f"{fam} · {label}": fonts for label, fonts in subgroups}
-            sub_plans, sub_cache = build_plans(
-                nested,
-                config,
-                verbosity=verbosity,
-                cached_clusters=cached_clusters,
-                grouping_mode=grouping_mode,
-                review_sink=review,
-                emit_review_report=False,
-            )
-            family_plans.update(sub_plans)
-            clusters_cache.update(sub_cache)
-            continue
-
         # Compute UPM majority for status reporting
         upm_counts: dict[int, int] = {}
         for fm in group:
@@ -806,44 +820,27 @@ def build_plans(
                 if not fm.is_unicase and not fm.is_script
             ]
             if other_decorative:
-                decorative_names = [Path(fm.path).name for fm in other_decorative]
-                indicator = cs.StatusIndicator("info").add_message(
+                span_note = ""
+                if main_cluster:
+                    cluster_spans = [
+                        (cfm.max_y - cfm.min_y) / cfm.upm
+                        for cfm in main_cluster
+                        if cfm.max_y is not None and cfm.min_y is not None and cfm.upm > 0
+                    ]
+                    avg_cluster_span = (
+                        sum(cluster_spans) / len(cluster_spans) if cluster_spans else 0
+                    )
+                    ratios = []
+                    for fm in other_decorative:
+                        if fm.max_y and fm.min_y and fm.upm > 0 and avg_cluster_span > 0:
+                            ratios.append((fm.max_y - fm.min_y) / fm.upm / avg_cluster_span)
+                    if ratios:
+                        span_note = f", span {min(ratios):.2f}–{max(ratios):.2f}× the core"
+                cs.StatusIndicator("info").add_message(
                     f"[field]Family:[/field] '{fam}' — "
-                    f"[bold]Decorative detector:[/bold] {cs.fmt_count(len(other_decorative))} font(s) "
-                    f"(expanded bounds, core metrics match)"
-                )
-                indicator.add_item(
-                    f"Detected as decorative: {', '.join(decorative_names)}",
-                    indent_level=1,
-                )
-                if verbosity >= Verbosity.VERBOSE:
-                    # Show span ratios for decorative fonts
-                    if main_cluster:
-                        cluster_spans = [
-                            (cfm.max_y - cfm.min_y) / cfm.upm
-                            for cfm in main_cluster
-                            if cfm.max_y is not None
-                            and cfm.min_y is not None
-                            and cfm.upm > 0
-                        ]
-                        avg_cluster_span = (
-                            sum(cluster_spans) / len(cluster_spans)
-                            if cluster_spans
-                            else 0
-                        )
-                        for fm in other_decorative:
-                            if fm.max_y and fm.min_y and fm.upm > 0:
-                                fm_span = (fm.max_y - fm.min_y) / fm.upm
-                                ratio = (
-                                    fm_span / avg_cluster_span
-                                    if avg_cluster_span > 0
-                                    else 0
-                                )
-                                indicator.add_item(
-                                    f"{Path(fm.path).name}: span ratio {ratio:.2f}x vs cluster avg",
-                                    indent_level=2,
-                                )
-                indicator.emit(console)
+                    f"{cs.fmt_count(len(other_decorative))} style(s) inherit the core line box"
+                    f"{span_note}"
+                ).emit(console)
 
             # Unicase detection: x-height ≈ cap-height
             unicase_in_clusters = sum(
@@ -937,11 +934,7 @@ def build_plans(
                     cs.StatusIndicator("info").add_message(cluster_msg).emit(console)
 
             if decorative_outliers:
-                # Separate unicase from other decorative variants for reporting
                 unicase_outliers = [fm for fm in decorative_outliers if fm.is_unicase]
-                other_decorative = [
-                    fm for fm in decorative_outliers if not fm.is_unicase
-                ]
 
                 if unicase_outliers:
                     indicator = cs.StatusIndicator("info").add_message(
@@ -959,22 +952,6 @@ def build_plans(
                         indent_level=1,
                     ).emit(console)
 
-                if other_decorative:
-                    indicator = cs.StatusIndicator("info").add_message(
-                        f"[field]Family:[/field] '{fam}' — "
-                        f"[bold]Decorative variants:[/bold] {cs.fmt_count(len(other_decorative))} font(s)"
-                    )
-                    if verbosity >= Verbosity.VERBOSE:
-                        outlier_names = [Path(fm.path).name for fm in other_decorative]
-                        indicator.add_item(
-                            f"Decorative fonts: {', '.join(outlier_names[:5])}{'...' if len(outlier_names) > 5 else ''}",
-                            indent_level=1,
-                        )
-                    indicator.add_item(
-                        "Inherit core typo, expand win bounds",
-                        indent_level=1,
-                    ).emit(console)
-
             # Report script font handling (already reported detection above, this is for processing)
             if script_outliers and verbosity >= Verbosity.VERBOSE:
                 cs.StatusIndicator("info").add_message(
@@ -982,8 +959,14 @@ def build_plans(
                     f"Script fonts will inherit core typo metrics and expand win bounds with {config.script_win_buffer_multiplier}x buffer"
                 ).emit(console)
 
-            # Level 4: Apply normalization per cluster
-            # Note: Decorative outliers are NOT in clusters, so they won't be processed here
+            # Level 4: Apply normalization per cluster.
+            # Several heights in one family share the tallest cap's line box.
+            cap_anchor = family_cap_anchor(group, main_cluster, config)
+            if cap_anchor is not None and verbosity >= Verbosity.BRIEF:
+                cs.StatusIndicator("info").add_message(
+                    f"[field]Family:[/field] '{fam}' — "
+                    f"heights share one line box, centered on the tallest cap"
+                ).emit(console)
             if verbosity >= Verbosity.DEBUG:
                 cs.StatusIndicator("info").add_message(
                     f"[field]Family:[/field] '{fam}' — "
@@ -1019,6 +1002,7 @@ def build_plans(
                         core_asc,
                         config,
                         verbosity,
+                        cap_anchor=cap_anchor,
                     )
                 else:
                     # True outlier: compute own ascender (don't use main cluster's)
@@ -1032,6 +1016,7 @@ def build_plans(
                         outlier_asc,
                         config,
                         verbosity,
+                        cap_anchor=cap_anchor,
                     )
 
             # Level 5: FINALIZE: Ensure Win >= Typo for ALL fonts (before decorative inheritance)
@@ -1056,26 +1041,13 @@ def build_plans(
                     norm_typo_asc, norm_typo_desc = get_cluster_normalized_typo(
                         typo_source
                     )
-                    # Always show decorative inheritance info (not just verbose)
-                    decorative_names = [
-                        Path(fm.path).name for fm in decorative_outliers
-                    ]
-                    main_cluster_names = [Path(fm.path).name for fm in typo_source]
-                    cs.StatusIndicator("info").add_message(
-                        f"[field]Family:[/field] '{fam}' — "
-                        f"Decorative fonts inheriting typo metrics from main cluster"
-                    ).add_item(
-                        f"Main cluster fonts: {', '.join(main_cluster_names)}",
-                        indent_level=1,
-                    ).add_item(
-                        f"Decorative fonts: {', '.join(decorative_names)}",
-                        indent_level=1,
-                    ).add_item(
-                        f"Inherited typo ascender: {int(round(norm_typo_asc * (typo_source[0].upm if typo_source else 1000)))}, "
-                        f"descender: {int(round(norm_typo_desc * (typo_source[0].upm if typo_source else 1000)))}",
-                        indent_level=1,
-                    ).emit(console)
-                    # Individual font inheritance messages shown below at VERBOSE level
+                    inherited_asc = int(round(norm_typo_asc * typo_source[0].upm))
+                    inherited_desc = int(round(norm_typo_desc * typo_source[0].upm))
+                    if verbosity >= Verbosity.DEBUG:
+                        cs.StatusIndicator("info").add_message(
+                            f"[field]Family:[/field] '{fam}' — "
+                            f"inherited line box {inherited_asc} / {inherited_desc}"
+                        ).emit(console)
                 else:
                     # Fallback: compute adaptive metrics for decorative outliers
                     for fm in decorative_outliers:
@@ -1098,66 +1070,24 @@ def build_plans(
                         # Unicase: Just inherit traditional typo metrics directly
                         # The unicase cap (which equals its x-height) will naturally
                         # align with the traditional x-height since both use same baseline
-                        old_asc = fm.target_typo_asc
                         fm.target_typo_asc = int(round(norm_typo_asc * fm.upm))
                         fm.target_typo_desc = int(round(norm_typo_desc * fm.upm))
-                        if (
-                            verbosity >= Verbosity.VERBOSE
-                            and old_asc != fm.target_typo_asc
-                        ):
-                            cs.StatusIndicator("info").add_message(
-                                f"{Path(fm.path).name}: Inherited ascender {old_asc} → {fm.target_typo_asc}, descender → {fm.target_typo_desc}"
-                            ).emit(console)
-
-                        # Report the alignment for clarity
-                        traditional_x = [
-                            cf.x_height / cf.upm
-                            for cf in typo_source
-                            if cf.x_height and cf.upm > 0
-                        ]
-                        if traditional_x and fm.cap_height:
-                            avg_trad_x = sum(traditional_x) / len(traditional_x)
-                            unicase_cap = fm.cap_height / fm.upm
-                            alignment_diff = (
-                                abs(unicase_cap - avg_trad_x) * 100
-                            )  # as % of UPM
-
-                            if (
-                                alignment_diff < 3.0 and verbosity >= Verbosity.VERBOSE
-                            ):  # Within 3% UPM
-                                cs.StatusIndicator("success").add_message(
-                                    f"{Path(fm.path).name}: Unicase cap ({fm.cap_height}) aligns with "
-                                    f"traditional x-height ({int(avg_trad_x * fm.upm)}) - "
-                                    f"baseline preserved"
-                                ).emit(console)
                     else:
                         # Regular decorative outlier: inherit typo as-is
-                        old_asc = fm.target_typo_asc
-                        old_desc = fm.target_typo_desc
-                        new_asc = int(round(norm_typo_asc * fm.upm))
-                        fm.target_typo_asc = new_asc
-                        new_desc = int(round(norm_typo_desc * fm.upm))
-                        fm.target_typo_desc = new_desc
-                        # Show inheritance for decorative fonts at VERBOSE level
-                        if verbosity >= Verbosity.VERBOSE:
-                            if old_asc != new_asc or old_desc != new_desc:
-                                cs.StatusIndicator("info").add_message(
-                                    f"{Path(fm.path).name}: Inherited typo metrics from main cluster"
-                                ).add_item(
-                                    f"Ascender: {old_asc} → {new_asc} (norm: {norm_typo_asc:.4f})",
-                                    indent_level=1,
-                                ).add_item(
-                                    f"Descender: {old_desc} → {new_desc}",
-                                    indent_level=1,
-                                ).emit(console)
-                            else:
-                                # Show even if no change (for transparency)
-                                cs.StatusIndicator("info").add_message(
-                                    f"{Path(fm.path).name}: Already matches main cluster metrics (asc: {new_asc}, desc: {new_desc})"
-                                ).emit(console)
+                        fm.target_typo_asc = int(round(norm_typo_asc * fm.upm))
+                        fm.target_typo_desc = int(round(norm_typo_desc * fm.upm))
 
-                    # Expand win for actual bounds (same for all decorative)
-                    if fm.max_y and fm.min_y:
+                    # Layer and swash keep the family's clipping box too. The extra
+                    # ink may clip. A shadow effect still widens Win around its outlines.
+                    if getattr(fm, "clip_with_family", False) and typo_source:
+                        ref = typo_source[0]
+                        if ref.upm > 0 and ref.target_win_asc is not None:
+                            fm.target_win_asc = int(round(ref.target_win_asc / ref.upm * fm.upm))
+                            fm.target_win_desc = int(round((ref.target_win_desc or 0) / ref.upm * fm.upm))
+                        else:
+                            fm.target_win_asc = fm.target_typo_asc
+                            fm.target_win_desc = abs(fm.target_typo_desc or 0)
+                    elif fm.max_y and fm.min_y:
                         fm.target_win_asc = int(
                             round(fm.max_y * (1.0 + config.win_buffer))
                         )

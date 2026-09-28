@@ -2,7 +2,7 @@
 
 **Version 3.2.2**
 
-Normalize vertical metrics across a font family — same line box, no clipping — without changing `unitsPerEm` or glyph outlines.
+Normalize vertical metrics across a font family — one line box, outlines unchanged — without changing `unitsPerEm`. Text stays inside the box. A layer or swash may clip.
 
 Formerly **FontMetricsNormalizer**. The public name and CLI are **ebrium**.
 
@@ -51,10 +51,10 @@ By default, matching fonts are **modified in place** (no backup). Use `-n` first
 
 1. **Measures** cap height, x-height, ascenders, descenders, accented capitals, and bounds  
 2. **Shares** one centered line box across the core styles in a family  
-3. **Inherits** that box for effect and script cuts, while Win covers their outlines  
+3. **Inherits** that box for a layer, swash, or script, while a color font with a color table copies one box across its files  
 4. **Applies** typo, hhea, a zero line gap, and `USE_TYPO_METRICS` when OS/2 version ≥ 4  
 
-Optical sizes named Caption, Display, Subhead, or Small Text each keep their own box. A layered or color stack copies one box across every layer file.
+The family name is the group. Two names share a box with `--match`. Style words such as Caption or Display do not split the group.
 
 For the line-box picture, how to read a run, every flag, and `probe`, use the [doc site](https://www.andrewsipe.com/Ebrium/).
 

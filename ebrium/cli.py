@@ -24,7 +24,6 @@ from . import grouping
 from . import measurements
 from . import models
 from . import planning
-from .optical_size import expand_optical_size_groups
 from . import validation
 
 console = get_console()
@@ -256,9 +255,7 @@ def main() -> None:
 
     cs.emit("", console=console)
     matched = grouping.parse_matched_groups(args)
-    families = expand_optical_size_groups(
-        group_families(args, measures, matched), matched
-    )
+    families = group_families(args, measures, matched)
     cs.emit("", console=console)
 
     # Map verbose count to Verbosity enum: 0=BRIEF, 1=VERBOSE, 2+=DEBUG

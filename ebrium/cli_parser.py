@@ -154,7 +154,6 @@ def build_parser() -> argparse.ArgumentParser:
         allow_abbrev=False,
         description=(
             "Give each family one centered line box. Outlines do not move. "
-            "Effect cuts inherit that box. Optical sizes each keep their own. "
             "ebrium probe reads those metrics and does not write."
         ),
         add_help=False,
@@ -172,14 +171,14 @@ def build_parser() -> argparse.ArgumentParser:
     ]
     notes = [
         "The plan is cap height, centered, at least 130% of the em. "
-        "A taller accent or a deeper descender can raise one side.",
-        "Shadow, Extrude, Fine, and similar effect cuts inherit the family's box. "
-        "Caption, Display, Subhead, and Small Text each get their own.",
+        "A deeper descender can lower the bottom. A tall accent stays in Win.",
+        "A style whose outlines pass a sibling with the same cap keeps that sibling's box and may clip. "
+        "The family name is the group. --match is how two names share that box.",
         "--no-cluster skips that plan. The family shares one box set to its outline extremes, so nothing clips.",
         '--match "Family A,Family B" pairs families whose names do not already group, so they share one line box. '
         "Repeat the flag for another pair. Each flag is its own pair.",
         "--span is the letter-span floor, as a percent of the em (default 130). "
-        "120 is tighter, 150 is looser. A measured accent can still raise it.",
+        "120 is tighter, 150 is looser. A measured descender can still lower it.",
         "--line-gap adds space between lines, as a percent of the em (default 0). "
         "0 means the box itself is the line spacing. 5 is slightly looser.",
         CHECKPOINT_NOTE,
@@ -206,7 +205,7 @@ def build_parser() -> argparse.ArgumentParser:
         default=130,
         metavar="PERCENT",
         help="letter-span floor as a percent of the em (default: 130). "
-        "Tighter 120, looser 150. A measured accent may still raise it",
+        "Tighter 120, looser 150. A measured descender may still lower it",
     )
     g_plan.add_argument(
         "--line-gap",

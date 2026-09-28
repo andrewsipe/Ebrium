@@ -188,7 +188,7 @@ class PlanningFixtureTest(unittest.TestCase):
             accented_cap_missing=False,
             target_span_norm=1.3,
         )
-        self.assertEqual(asc, 1100)
+        self.assertEqual(asc, 1000)
         self.assertEqual(desc, -400)
         self.assertTrue(exceeded)
 

@@ -47,9 +47,9 @@ class ReviewTest(unittest.TestCase):
         self.assertGreaterEqual(base.target_win_asc, 1400)
         self.assertGreaterEqual(base.target_win_desc, 500)
 
-    def test_named_layers_count_without_color_tables(self) -> None:
+    def test_layer_in_the_filename_is_not_a_stack(self) -> None:
         group = [_fm("Font-Layer1"), _fm("Font-Layer2")]
-        self.assertTrue(is_layered_set(group))
+        self.assertFalse(is_layered_set(group))
 
     def test_one_color_file_is_not_a_stack(self) -> None:
         group = [_fm("Text-Regular"), _fm("Text-Color", color=True)]

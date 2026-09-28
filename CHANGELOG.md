@@ -7,15 +7,19 @@ The command groups by family name and writes one centered line box.
 
 ### Changed
 - Capitals stay centered. If the box is under the span floor it grows
-  while staying centered. A measured accent or descender can raise one
-  side past that floor. The old 60/40 split and the x-height span bump
-  are gone.
-- Effect cuts (Shadow, Extrude, Fine, and similar) inherit the family's
-  box. Optical sizes named Caption, Display, Subhead, or Small Text each
-  keep their own. A layered or color set copies one box across its files.
+  while staying centered. A measured descender can lower the bottom past
+  that floor. A tall accent does not raise the line box; Win covers it.
+  The old 60/40 split and the x-height span bump are gone.
+- A layer or swash is detected from the outlines, not the file name. When
+  the cap still matches a sibling and the ink runs at least 10% of the em past
+  that sibling, the file keeps the base line box and the extra ink may clip.
+  Style words such as Caption or Display do not split the family.
+  A color font family with a color table copies one box across its files.
 - A Review block lists only what is worth a look. It does not change the plan.
-  A script or effect cut that leaves the shared box is listed with how much
+  A script or layer that leaves the shared box is listed with how much
   the line box would have moved if that file had stayed.
+- A family with more than one cap height, such as Short and Tall under one
+  name, shares one line box centered on the tallest cap.
 - A script is an outline at least twice the em and heavier below the baseline.
   A face that only just crosses that line stays in the core.
 

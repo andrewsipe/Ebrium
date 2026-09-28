@@ -72,7 +72,7 @@ def report_changes(families, plans, args, forced_groups) -> bool:
 
     sorted_families = sorted(plans.items(), key=lambda x: get_impact_category(x[0]))
 
-    for fam, (_fam_min, _fam_max, fam_asc) in sorted_families:
+    for fam, (_fam_min, _fam_max, _fam_asc) in sorted_families:
         group = families[fam]
         avg_typo, avg_span, num_fonts, has_changes = analyze_family_impact(group)
 
@@ -86,16 +86,23 @@ def report_changes(families, plans, args, forced_groups) -> bool:
 
         verbose = int(getattr(args, "verbose", 0) or 0)
         style_word = "style" if num_fonts == 1 else "styles"
-        if verbose >= 1:
-            upms = {fm.upm for fm in group}
-            upm_note = str(next(iter(upms))) if len(upms) == 1 else "mixed"
-            detail = f" (planned ascender {fam_asc:.3f} · UPM {upm_note})"
+        share_word = "shares" if num_fonts == 1 else "share"
+        box = next(
+            (
+                fm
+                for fm in group
+                if fm.target_typo_asc is not None and fm.target_typo_desc is not None
+            ),
+            None,
+        )
+        if verbose >= 1 and box is not None:
+            detail = f" — {box.target_typo_asc} / {box.target_typo_desc}"
         else:
             detail = ""
 
         if not has_changes or avg_typo < 0.1:
             cs.StatusIndicator("info").add_message(
-                f"{family_label} — {cs.fmt_count(num_fonts)} {style_word} already share a plan{detail}"
+                f"{family_label} — {cs.fmt_count(num_fonts)} {style_word} already {share_word} a plan{detail}"
             ).emit(console)
             continue
 

@@ -131,6 +131,10 @@ class MetricsConfig:
     decorative_span_threshold: float = (
         1.4  # 1.4x span minimum (changed from 1.3x to create gap with script)
     )
+    # A sibling whose cap matches, but whose outlines pass the family's
+    # ink by this much of the em, keeps the base line box and may clip.
+    # Weight and italic differences stay under it. A shadow or swash clears it.
+    companion_ink_extra: float = 0.10
     script_win_buffer_multiplier: float = (
         1.5  # Buffer multiplier for script fonts (1.5x default)
     )

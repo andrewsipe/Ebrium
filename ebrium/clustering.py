@@ -1,7 +1,5 @@
 """Optical clustering logic for grouping similar fonts."""
 
-import re
-from pathlib import Path
 from typing import Optional
 
 from . import config
@@ -9,28 +7,6 @@ from . import models
 
 MetricsConfig = config.MetricsConfig
 FontMeasures = models.FontMeasures
-
-# Plain cut vs effect dress. Used only when a family actually contains a Face
-# style — otherwise these tokens are ignored (no false splits).
-_FACE_TOKEN = "face"
-_EFFECT_TOKENS = frozenset(
-    {
-        "coarse",
-        "extrude",
-        "fill",
-        "fine",
-        "halftone",
-        "inline",
-        "lines",
-        "outline",
-        "reverse",
-        "rough",
-        "shade",
-        "shaded",
-        "shadow",
-    }
-)
-
 
 def compute_optical_similarity(
     fm1: FontMeasures, fm2: FontMeasures, threshold: float, config: MetricsConfig
@@ -117,9 +93,6 @@ def detect_decorative_outlier(
         # No cluster context - trust standalone detection
         return fm.is_decorative_candidate
 
-    # Check if marked as candidate during measurement
-    is_candidate = fm.is_decorative_candidate
-
     # Pre-check: Reject structurally different fonts (script, extreme display)
     # Compare span against cluster average
     if fm.max_y is not None and fm.min_y is not None and fm.upm > 0:
@@ -149,10 +122,6 @@ def detect_decorative_outlier(
     if not matches_core:
         # Different structure - not a decorative variant
         return False
-
-    # If candidate OR matches cluster with inflated bounds
-    if is_candidate:
-        return True
 
     # Check bounds inflation vs cluster
     cluster_max_avg = sum(
@@ -235,52 +204,74 @@ def detect_script_font(
     return False
 
 
-def _name_tokens(fm: FontMeasures) -> list[str]:
-    """Split a filename stem into lowercase tokens (hyphens and CamelCase)."""
-    stem = Path(fm.path).stem
-    tokens: list[str] = []
-    for part in re.split(r"[-_ ]+", stem):
-        tokens.extend(
-            re.findall(r"[A-Z]+(?=[A-Z][a-z])|[A-Z]?[a-z]+|[A-Z]+|\d+", part)
-        )
-    return [t.lower() for t in tokens if t]
+def _upm_fraction(value: Optional[int], upm: int) -> Optional[float]:
+    if value is None or upm <= 0:
+        return None
+    return float(value) / float(upm)
 
 
-def _is_face_cut(fm: FontMeasures) -> bool:
-    return _FACE_TOKEN in _name_tokens(fm)
+def _can_anchor_ink(fm: FontMeasures) -> bool:
+    """A reference style has real letter descenders, so an all-caps cut cannot pose as the base."""
+    depth = _upm_fraction(fm.descender_min, fm.upm)
+    return depth is not None and depth <= -0.05
 
 
-def _is_effect_cut(fm: FontMeasures) -> bool:
-    return bool(_EFFECT_TOKENS.intersection(_name_tokens(fm)))
+def _extends_past_sibling(fm: FontMeasures, other: FontMeasures, config: MetricsConfig) -> bool:
+    """True when fm's outlines pass other's by the companion margin and the caps still match."""
+    if not _can_anchor_ink(other):
+        return False
+    cap = _upm_fraction(fm.cap_optical, fm.upm)
+    ocap = _upm_fraction(other.cap_optical, other.upm)
+    ink_min = _upm_fraction(fm.min_y, fm.upm)
+    ink_max = _upm_fraction(fm.max_y, fm.upm)
+    omin = _upm_fraction(other.min_y, other.upm)
+    omax = _upm_fraction(other.max_y, other.upm)
+    if None in (cap, ocap, ink_min, ink_max, omin, omax):
+        return False
+    # Three times the optical match. A shadow can lift the cap box a little.
+    # A Short / Tall pair is much further apart and stays one height family.
+    if abs(cap - ocap) > config.optical_threshold * 3:
+        return False
+    extra = config.companion_ink_extra
+    deeper = omin - ink_min
+    taller = ink_max - omax
+    # The sibling stays inside this outline. Two styles that bulge in
+    # opposite directions are not a base and a companion.
+    sibling_inside = (ink_min - omin) < extra and (omax - ink_max) < extra
+    return sibling_inside and (deeper >= extra or taller >= extra)
+
+
+def _is_outline_companion(fm: FontMeasures, group: list[FontMeasures], config: MetricsConfig) -> bool:
+    return any(other is not fm and _extends_past_sibling(fm, other, config) for other in group)
 
 
 def peel_effect_outliers(
     group: list[FontMeasures],
+    config: Optional[MetricsConfig] = None,
 ) -> tuple[list[FontMeasures], list[FontMeasures]]:
-    """Split Face cores from effect cuts.
+    """Split outline companions from the base styles.
 
-    When the group contains a Face style, effect-token styles inherit typo
-    instead of joining the optical cluster. A font already marked decorative
-    peels the same way even without a Face token, unless it is itself a Face cut.
+    A style whose cap still matches a sibling, but whose outlines run at least
+    10% of the em past that sibling, keeps the base line box and may clip.
+    The file name is not used. A tall bounding box by itself does not peel.
 
     Returns (remaining, decorative_outliers). Remaining is never emptied
     solely by this split — if nothing would be left to plan, the group is
     returned unchanged.
     """
+    config = config or MetricsConfig()
     if len(group) < 2:
         return group, []
 
-    has_face = any(_is_face_cut(fm) for fm in group)
     remaining: list[FontMeasures] = []
     peeled: list[FontMeasures] = []
 
     for fm in group:
-        face = _is_face_cut(fm)
-        assumed = bool(fm.is_decorative_candidate) and not face
-        effect = has_face and _is_effect_cut(fm) and not face
-        if assumed or effect:
+        companion = _is_outline_companion(fm, group, config)
+        if companion:
             fm.is_decorative_outlier = True
             fm.is_decorative_candidate = False
+            fm.clip_with_family = True
             peeled.append(fm)
         else:
             remaining.append(fm)
@@ -288,6 +279,7 @@ def peel_effect_outliers(
     if not remaining:
         for fm in peeled:
             fm.is_decorative_outlier = False
+            fm.clip_with_family = False
         return group, []
 
     return remaining, peeled
@@ -305,7 +297,7 @@ def cluster_group_helper(
     if len(group) <= 1:
         return ([group] if group else [], [], [])
 
-    group, peeled_effects = peel_effect_outliers(group)
+    group, peeled_effects = peel_effect_outliers(group, config)
     if len(group) <= 1:
         return ([group] if group else [], peeled_effects, [])
 
@@ -407,10 +399,7 @@ def detect_optical_clusters(
     if len(measures) <= 1:
         return ([measures] if measures else [], [], [])
 
-    # Effect cuts (Shadow, Fine, Inline, …) must leave before unicase detection.
-    # Their distorted cap height can look like x-height ≈ cap, which would
-    # mislabel them unicase instead of decorative outliers inheriting Face typo.
-    measures, peeled_effects = peel_effect_outliers(measures)
+    measures, peeled_effects = peel_effect_outliers(measures, config)
     if len(measures) <= 1:
         return ([measures] if measures else [], peeled_effects, [])
 
