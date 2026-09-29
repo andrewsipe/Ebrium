@@ -636,7 +636,10 @@ td code {
   width: 100%;
   max-width: 100%;
   height: auto;
-  display: block;
+  padding: 0 15.3px;
+  display: grid;
+  justify-self: center;
+  align-self: center;
 }
 
 .concept-legend {
