@@ -587,8 +587,8 @@ td code {
 /* Assume-mode specimens */
 .modes {
   display: grid;
-  gap: 0.75rem;
-  margin: 1rem 0 1.25rem;
+  gap: 0.85rem;
+  margin: 0 0 1.25rem;
   min-width: 0;
 }
 
@@ -623,10 +623,13 @@ td code {
 
 .specimen-stage {
   display: block;
-  width: 100%;
+  width: auto;
   min-width: 0;
   height: auto;
-  padding: 0.7rem 0.75rem;
+  margin: 0.15rem -0.9rem 0.15rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
 }
 
 .specimen-stage img {
@@ -637,7 +640,7 @@ td code {
 }
 
 .concept-legend {
-  margin: 0.25rem 0 0.15rem;
+  margin: 0 0 0.85rem;
 }
 
 .concept-legend img {
