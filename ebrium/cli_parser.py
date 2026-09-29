@@ -179,6 +179,9 @@ def build_parser() -> argparse.ArgumentParser:
         "A style whose outlines pass a sibling with the same cap keeps that sibling's box and may clip. "
         "The family name is the group. --match is how two names share that box.",
         "--no-cluster skips that plan. The family shares one box set to its outline extremes, so nothing clips.",
+        "--bbox-centered keeps that family span, then shifts each file so its "
+        "bounding box sits in the middle. Cap height is no longer the center. "
+        "Styles in the family will not share a baseline.",
         '--match "Family A,Family B" pairs families whose names do not already group, so they share one line box. '
         "A filename form matches the same name: FamilyShort is Family Short. "
         "Repeat the flag for another pair. Each flag is its own pair.",
@@ -221,6 +224,12 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="PERCENT",
         help="extra space between lines as a percent of the em (default: 0). "
         "5 is slightly looser",
+    )
+    g_plan.add_argument(
+        "--bbox-centered",
+        action="store_true",
+        help="keep the family span, and center each file on its bounding box. "
+        "Styles will not share a baseline",
     )
     g_plan.add_argument(
         "--no-cluster",

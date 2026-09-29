@@ -86,6 +86,23 @@ class FamilyCloseTest(unittest.TestCase):
             self.assertIsNone(fm.target_typo_desc)
             self.assertEqual(fm.target_line_gap, 50)
 
+    def test_bbox_centered_shares_the_span_and_shifts_each_file(self) -> None:
+        low = _bare("Low", 600)
+        high = _bare("High", 600)
+        low.min_y, low.max_y = -100, 700  # midpoint 300
+        high.min_y, high.max_y = -300, 500  # midpoint 100
+        build_plans(
+            {"Filled": [low, high]},
+            MetricsConfig(bbox_centered=True),
+            emit_review_report=False,
+        )
+        span_low = low.target_typo_asc - low.target_typo_desc
+        span_high = high.target_typo_asc - high.target_typo_desc
+        self.assertEqual(span_low, span_high)
+        self.assertAlmostEqual((low.target_typo_asc + low.target_typo_desc) / 2, 300, delta=1)
+        self.assertAlmostEqual((high.target_typo_asc + high.target_typo_desc) / 2, 100, delta=1)
+        self.assertGreaterEqual(low.target_win_desc, abs(low.target_typo_desc))
+
 
 class ReportGateTest(unittest.TestCase):
     def test_a_small_percent_still_counts_when_a_font_changes(self) -> None:

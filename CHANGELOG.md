@@ -55,6 +55,8 @@ The command groups by family name and writes one centered line box.
   family's outline extremes so nothing clips. Formerly `--safe-max`.
 - `--match` pairs families whose names do not already group, so they
   share one line box. Formerly `--merge`. The old spelling still parses.
+- `--bbox-centered` keeps the family's span and centers each file on its
+  bounding box instead of the cap height. Styles do not share a baseline.
 
 ## [3.2.2] - 2026-09-21
 

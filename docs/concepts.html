@@ -109,7 +109,7 @@
     <p><code>--span</code> (default 130) is the letter-span floor, as a percent of the em. 120 is tighter, 150 is looser. A measured descender can still lower that box. <code>0</code> leaves each file's ascender and descender as they are, and the line gap can still change. <code>--line-gap</code> (default 0) adds space between lines, also as a percent of the em. 5 is slightly looser.</p>
 
     <h2>Shared box</h2>
-    <p>A run gives the core styles in a family one line box. <code>--match "Family A,Family B"</code> puts two families that do not already share a name onto that same box. <code>probe</code> shows how far each file’s stored ascender would move to match it. <code>--no-cluster</code> replaces that plan with one box from the family’s outline extremes.</p>
+    <p>A run gives the core styles in a family one line box. <code>--match "Family A,Family B"</code> puts two families that do not already share a name onto that same box. <code>probe</code> shows how far each file’s stored ascender would move to match it. <code>--no-cluster</code> replaces that plan with one box from the family’s outline extremes. <code>--bbox-centered</code> keeps the planned span and shifts each file so its bounding box sits in the middle. The styles no longer share a baseline.</p>
 
     <h2 id="assume">What the outlines decide</h2>
     <figure class="concept-legend">

@@ -39,6 +39,7 @@
         <tr><td><code>--span %</code></td><td>Letter-span floor (default 130). 0 keeps each file's current span. Tighter 120, looser 150.</td></tr>
         <tr><td><code>--line-gap %</code></td><td>Extra space between lines (default 0). 5 is slightly looser.</td></tr>
         <tr><td><code>--no-cluster</code></td><td>One box from the family's outline extremes, so nothing clips.</td></tr>
+        <tr><td><code>--bbox-centered</code></td><td>Keep the family's span. Center each file on its bounding box, so styles do not share a baseline.</td></tr>
         <tr><td><code>--match "Family A,Family B"</code></td><td>Pair family names that do not already group, so they share one line box. A filename form matches the same name: FamilyShort is Family Short. Repeat the flag for another pair.</td></tr>
         <tr><td><code>ebrium probe fonts/ -r</code></td><td>Read the metrics. Write nothing.</td></tr>
       </tbody>

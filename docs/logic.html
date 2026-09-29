@@ -41,7 +41,7 @@
       </li>
       <li>
         <span class="term">Plan</span>
-        Center capitals in the line box and grow to the span floor (<code>--span</code>, default 130) while staying centered. <code>--span 0</code> leaves each file's ascender and descender as they are. Lower the bottom only when a measured descender needs it. A tall accent stays in Win. Short and Tall under one family name share that box, centered on the tallest cap. The line gap is 0 unless <code>--line-gap</code> says otherwise. Win is the outline extremes plus 2% on the core styles. A layer or swash keeps that Win and may clip. A script can widen it. See <a href="concepts.html">Concepts</a>.
+        Center capitals in the line box and grow to the span floor (<code>--span</code>, default 130) while staying centered. <code>--span 0</code> leaves each file's ascender and descender as they are. <code>--bbox-centered</code> keeps the family span and centers each file on its bounding box instead of the cap, so the styles do not share a baseline. Lower the bottom only when a measured descender needs it. A tall accent stays in Win. Short and Tall under one family name share that box, centered on the tallest cap. The line gap is 0 unless <code>--line-gap</code> says otherwise. Win is the outline extremes plus 2% on the core styles. A layer or swash keeps that Win and may clip. A script can widen it. See <a href="concepts.html">Concepts</a>.
       </li>
       <li>
         <span class="term">Apply</span>
@@ -58,7 +58,7 @@
         <tr>
           <td><code>ebrium</code></td>
           <td>By family name. <code>--match</code> pairs names that should share a box</td>
-          <td>One centered box. <code>--no-cluster</code> uses outline extremes instead</td>
+          <td>One centered box. <code>--no-cluster</code> uses outline extremes instead. <code>--bbox-centered</code> keeps the span and centers each file on its bounding box</td>
         </tr>
         <tr>
           <td><code>ebrium probe</code></td>

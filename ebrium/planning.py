@@ -388,6 +388,39 @@ def plan_identical_metrics(
                 fm.target_typo_desc = fm.descender_min
 
 
+def center_family_on_bbox(fonts: list[FontMeasures]) -> bool:
+    """Shift each file so its ink sits in the middle of the family's span.
+
+    The span stays the one the plan already chose, shared across the family.
+    A file with no measured bounds keeps the cap-centered box.
+    Returns True when at least one file was shifted.
+    """
+    span_norms = [
+        (fm.target_typo_asc - fm.target_typo_desc) / fm.upm
+        for fm in fonts
+        if fm.upm > 0
+        and fm.target_typo_asc is not None
+        and fm.target_typo_desc is not None
+    ]
+    if not span_norms:
+        return False
+    span_norm = max(span_norms)
+    shifted = False
+    for fm in fonts:
+        if fm.upm <= 0 or fm.min_y is None or fm.max_y is None:
+            continue
+        if fm.target_typo_asc is None or fm.target_typo_desc is None:
+            continue
+        span = int(round(span_norm * fm.upm))
+        mid = (fm.min_y + fm.max_y) / 2.0
+        asc = int(round(mid + span / 2.0))
+        fm.target_typo_asc = asc
+        fm.target_typo_desc = asc - span
+        finalize_metrics(fm)
+        shifted = True
+    return shifted
+
+
 def finalize_metrics(fm: FontMeasures) -> None:
     """Ensure Win >= Typo after all planning."""
     if fm.target_win_asc is not None and fm.target_typo_asc is not None:
@@ -630,6 +663,12 @@ def build_plans(
     def _close(name: str, fonts: list[FontMeasures]) -> None:
         if config.target_span > 0:
             stamp_layered_metrics(fonts, config)
+            if getattr(config, "bbox_centered", False) and center_family_on_bbox(fonts):
+                if verbosity >= Verbosity.BRIEF:
+                    cs.StatusIndicator("info").add_message(
+                        f"[field]Family:[/field] '{_escape_markup(name)}' — "
+                        "each file is centered on its bounding box, in the family's span"
+                    ).emit(console)
         else:
             # --span 0 keeps each file's typo ascender and descender.
             for fm in fonts:

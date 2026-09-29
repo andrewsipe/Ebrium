@@ -102,6 +102,7 @@ def main() -> None:
     config = MetricsConfig(
         target_span=args.span / 100.0,
         line_gap=(args.line_gap / 100.0) if args.line_gap > 0 else 0.0,
+        bbox_centered=bool(getattr(args, "bbox_centered", False)),
     )
 
     files = scan_fonts(args.paths or ["."], args.recursive, args.use_ttx)

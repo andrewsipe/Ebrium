@@ -55,6 +55,7 @@ class ParserTest(unittest.TestCase):
         self.assertIn("--match", help_text)
         self.assertNotIn("--merge", help_text)
         self.assertIn("keeps each file's current span", help_text)
+        self.assertIn("--bbox-centered", help_text)
         self.assertIn("reuse a checkpoint", help_text)
 
 
