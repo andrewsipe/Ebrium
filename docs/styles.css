@@ -636,6 +636,17 @@ td code {
   display: block;
 }
 
+.concept-legend {
+  margin: 0.25rem 0 0.15rem;
+}
+
+.concept-legend img {
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
 .linebox-nums {
   list-style: none;
   display: grid;
