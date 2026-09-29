@@ -43,8 +43,9 @@ PROBE_EXIT_CODES = {
 
 CHECKPOINT_NOTE = (
     "Every run, even with -n, writes .metrics_checkpoint.json to the current "
-    "directory. It caches measurements and clusters, and resets when the options "
-    "or the font set change."
+    "directory. It caches measurements and clusters. A font is measured again "
+    "when its size or modification time changes, or when the options or the "
+    "file list change."
 )
 
 PANEL_ROWS_BASIC = [("Preview only", "-n, --dry-run")]
@@ -67,7 +68,10 @@ def _add_input_args(g: Any) -> None:
 
 def _add_preview_args(g: Any) -> None:
     g.add_argument("-n", "--dry-run", action="store_true", help="preview changes without writing")
-    g.add_argument("-y", "--yes", action="store_true", help="skip the 'Proceed? [y/N]' prompt")
+    g.add_argument(
+        "-y", "--yes", action="store_true",
+        help="reuse a checkpoint whose files are unchanged, and skip the 'Proceed? [y/N]' prompt",
+    )
 
 
 def _add_general_args(g: Any, verbose_help: str) -> None:
@@ -179,7 +183,8 @@ def build_parser() -> argparse.ArgumentParser:
         "A filename form matches the same name: FamilyShort is Family Short. "
         "Repeat the flag for another pair. Each flag is its own pair.",
         "--span is the letter-span floor, as a percent of the em (default 130). "
-        "120 is tighter, 150 is looser. A measured descender can still lower it.",
+        "0 keeps each file's current span. 120 is tighter, 150 is looser. "
+        "A measured descender can still lower a span above 0.",
         "--line-gap adds space between lines, as a percent of the em (default 0). "
         "0 means the box itself is the line spacing. 5 is slightly looser.",
         CHECKPOINT_NOTE,
@@ -206,7 +211,8 @@ def build_parser() -> argparse.ArgumentParser:
         default=130,
         metavar="PERCENT",
         help="letter-span floor as a percent of the em (default: 130). "
-        "Tighter 120, looser 150. A measured descender may still lower it",
+        "0 keeps each file's current span. Tighter 120, looser 150. "
+        "A measured descender may still lower a span above 0",
     )
     g_plan.add_argument(
         "--line-gap",

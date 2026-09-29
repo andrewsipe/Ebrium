@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import os
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -31,6 +32,15 @@ def compute_config_hash(config: MetricsConfig) -> str:
         f"{config.max_span_ratio}"
     )
     return hashlib.md5(config_str.encode()).hexdigest()[:8]
+
+
+def _file_stamp(path: str) -> Optional[tuple[int, int]]:
+    """Size and modification time, so a replaced file is not reused."""
+    try:
+        st = os.stat(path)
+    except OSError:
+        return None
+    return int(st.st_mtime_ns), int(st.st_size)
 
 
 def save_measurements_checkpoint(
@@ -87,6 +97,10 @@ def save_measurements_checkpoint(
                 measure_data["advance_widths"] = {
                     str(cp): w for cp, w in fm.advance_widths.items()
                 }
+            stamp = _file_stamp(fm.path)
+            if stamp is not None:
+                measure_data["mtime_ns"] = stamp[0]
+                measure_data["size"] = stamp[1]
             checkpoint_data["measures"].append(measure_data)
 
         checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
@@ -136,7 +150,9 @@ def load_measurements_checkpoint(
             # If hash doesn't match, clusters are invalid (config changed)
 
         loaded_measures: list[FontMeasures] = []
-        checkpoint_paths = {m["path"] for m in checkpoint_data.get("measures", [])}
+        checkpoint_paths: set[str] = set()
+        stale = 0
+        unstamped = 0
 
         # Reconstruct FontMeasures objects
         for measure_data in checkpoint_data.get("measures", []):
@@ -144,6 +160,17 @@ def load_measurements_checkpoint(
             if not path or not Path(path).exists():
                 continue  # Skip files that no longer exist
 
+            stored_mtime = measure_data.get("mtime_ns")
+            stored_size = measure_data.get("size")
+            if stored_mtime is None or stored_size is None:
+                unstamped += 1
+                continue
+            stamp = _file_stamp(path)
+            if stamp != (int(stored_mtime), int(stored_size)):
+                stale += 1
+                continue
+
+            checkpoint_paths.add(path)
             upm = measure_data.get("upm", 1000)
             fm = FontMeasures(path, upm)
             fm.family_name = measure_data.get("family_name", "Unknown")
@@ -167,6 +194,21 @@ def load_measurements_checkpoint(
             if raw_widths:
                 fm.advance_widths = {int(cp): w for cp, w in raw_widths.items()}
             loaded_measures.append(fm)
+
+        if unstamped:
+            cs.StatusIndicator("info").add_message(
+                f"Checkpoint has no file timestamps for {cs.fmt_count(unstamped)} "
+                "font(s), so those will be measured again"
+            ).emit(console)
+        if stale:
+            cs.StatusIndicator("info").add_message(
+                f"{cs.fmt_count(stale)} font(s) changed since the checkpoint "
+                "and will be measured again"
+            ).emit(console)
+        # A changed file keeps the same path, so a stored cluster would
+        # describe the old outlines. Cluster again from the measurements kept.
+        if unstamped or stale:
+            cached_clusters = None
 
         # Determine missing files
         if expected_files:

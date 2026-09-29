@@ -1,21 +1,68 @@
 """Application functions for applying metrics to font files."""
 
+import os
+import shutil
+from enum import Enum
+from typing import Optional
 
 import FontCore.core_console_styles as cs
 from FontCore.core_console_styles import get_console
 
+from . import font_io
 from . import models
 
 console = get_console()
 FontMeasures = models.FontMeasures
 
 
-def apply_metrics(fp: str, fm: FontMeasures, dry_run: bool) -> tuple[bool, str]:
-    """Apply computed metrics to font file."""
-    try:
-        from fontTools.ttLib import TTFont
+class ApplyStatus(Enum):
+    UPDATED = "updated"
+    UNCHANGED = "unchanged"
+    ERROR = "error"
+    PREVIEW = "preview"
 
-        font = TTFont(fp)
+
+def _or_old(new: Optional[int], old: int) -> int:
+    """A planned 0 is a real value. Only a missing plan keeps the stored number."""
+    return old if new is None else int(new)
+
+
+def measured_os2_heights(fm: FontMeasures, os2) -> dict[str, int]:
+    """Glyph x-height and cap height, when the OS/2 table can store them.
+
+    Version 2 added ``sxHeight`` and ``sCapHeight``. An older table drops
+    those fields on save, so writing them would change nothing and the next
+    run would try again. A missing glyph measurement is left alone.
+    """
+    if os2 is None or int(getattr(os2, "version", 0) or 0) < 2:
+        return {}
+    heights: dict[str, int] = {}
+    if fm.x_height and fm.x_height > 0:
+        heights["sxHeight"] = int(fm.x_height)
+    if fm.cap_height and fm.cap_height > 0:
+        heights["sCapHeight"] = int(fm.cap_height)
+    return heights
+
+
+def _note_old_os2(indicator, os2) -> None:
+    """Say when the typo box cannot be selected. Versioning stays elsewhere."""
+    if os2 is None:
+        return
+    version = int(getattr(os2, "version", 0) or 0)
+    if version >= 4:
+        return
+    indicator.add_item(
+        "Use Typo Metrics is not set (OS/2 is older than version 4)",
+        indent_level=1,
+    )
+
+
+def apply_metrics(fp: str, fm: FontMeasures, dry_run: bool) -> tuple[ApplyStatus, str]:
+    """Apply computed metrics to font file."""
+    font = None
+    tmp = None
+    try:
+        font = font_io._read_ttfont(fp)
         orig_flavor = getattr(font, "flavor", None)
 
         old_vals: dict[str, int] = {}
@@ -31,17 +78,38 @@ def apply_metrics(fp: str, fm: FontMeasures, dry_run: bool) -> tuple[bool, str]:
             old_vals["sTypoAscender"] = int(getattr(os2, "sTypoAscender", 0) or 0)
             old_vals["sTypoDescender"] = int(getattr(os2, "sTypoDescender", 0) or 0)
             old_vals["sTypoLineGap"] = int(getattr(os2, "sTypoLineGap", 0) or 0)
+            old_vals["sxHeight"] = int(getattr(os2, "sxHeight", 0) or 0)
+            old_vals["sCapHeight"] = int(getattr(os2, "sCapHeight", 0) or 0)
             old_vals["fsSelection"] = int(getattr(os2, "fsSelection", 0) or 0)
         if hhea:
             old_vals["hhea.ascent"] = int(getattr(hhea, "ascent", 0) or 0)
             old_vals["hhea.descent"] = int(getattr(hhea, "descent", 0) or 0)
             old_vals["hhea.lineGap"] = int(getattr(hhea, "lineGap", 0) or 0)
 
+        # A font with no plan is left alone, including its line gap.
+        has_plan = any(
+            value is not None
+            for value in (
+                fm.target_win_asc,
+                fm.target_win_desc,
+                fm.target_typo_asc,
+                fm.target_typo_desc,
+            )
+        )
+        if not has_plan:
+            indicator = (
+                cs.StatusIndicator("unchanged")
+                .add_file(fp, filename_only=False)
+                .add_message("(no plan)")
+            )
+            _note_old_os2(indicator, os2)
+            return ApplyStatus.UNCHANGED, indicator.build()
+
         # Compute new values (Win >= Typo already enforced in planning phase)
-        win_asc = fm.target_win_asc or old_vals.get("usWinAscent", 0)
-        win_desc = fm.target_win_desc or old_vals.get("usWinDescent", 0)
-        typ_asc = fm.target_typo_asc or old_vals.get("sTypoAscender", 0)
-        typ_desc = fm.target_typo_desc or old_vals.get("sTypoDescender", 0)
+        win_asc = _or_old(fm.target_win_asc, old_vals.get("usWinAscent", 0))
+        win_desc = _or_old(fm.target_win_desc, old_vals.get("usWinDescent", 0))
+        typ_asc = _or_old(fm.target_typo_asc, old_vals.get("sTypoAscender", 0))
+        typ_desc = _or_old(fm.target_typo_desc, old_vals.get("sTypoDescender", 0))
         line_gap = int(getattr(fm, "target_line_gap", 0) or 0)
 
         new_vals = {
@@ -54,6 +122,11 @@ def apply_metrics(fp: str, fm: FontMeasures, dry_run: bool) -> tuple[bool, str]:
             "hhea.descent": typ_desc,
             "hhea.lineGap": line_gap,
         }
+        new_vals.update(measured_os2_heights(fm, os2))
+        # USE_TYPO_METRICS is part of the plan. Count it even when the
+        # ascender, descender, and line gap are already in place.
+        if os2 and getattr(os2, "version", 0) >= 4:
+            new_vals["fsSelection"] = int(old_vals.get("fsSelection", 0)) | (1 << 7)
 
         # Determine changes
         diff_keys = [k for k, v in new_vals.items() if old_vals.get(k) != v]
@@ -63,17 +136,8 @@ def apply_metrics(fp: str, fm: FontMeasures, dry_run: bool) -> tuple[bool, str]:
                 .add_file(fp, filename_only=False)
                 .add_message("(no metric changes)")
             )
-            return False, indicator.build()
-
-        # Track fsSelection USE_TYPO_METRICS bit (bit 7)
-        if os2 and getattr(os2, "version", 0) >= 4:
-            new_fs_selection = int(getattr(os2, "fsSelection", 0) or 0) | (1 << 7)
-            if new_fs_selection != old_vals.get("fsSelection", 0):
-                if "fsSelection" not in diff_keys:
-                    diff_keys.append("fsSelection")
-                new_vals["fsSelection"] = new_fs_selection
-        else:
-            new_vals["fsSelection"] = old_vals.get("fsSelection", 0)
+            _note_old_os2(indicator, os2)
+            return ApplyStatus.UNCHANGED, indicator.build()
 
         # Compute summary
         old_span = old_vals.get("sTypoAscender", 0) + abs(
@@ -105,6 +169,8 @@ def apply_metrics(fp: str, fm: FontMeasures, dry_run: bool) -> tuple[bool, str]:
                     "sTypoAscender",
                     "sTypoDescender",
                     "sTypoLineGap",
+                    "sxHeight",
+                    "sCapHeight",
                     "fsSelection",
                 ]
             ]
@@ -137,12 +203,12 @@ def apply_metrics(fp: str, fm: FontMeasures, dry_run: bool) -> tuple[bool, str]:
                         f"{short_name}: {cs.fmt_change(str(old_vals.get(k, '—')), str(new_vals.get(k, '—')))}",
                         indent_level=1,
                     )
-            cs.emit("")
             indicator.add_item(
                 f"[dim]vertical span:[/dim] {old_span} → {new_span} ({span_diff:+.1f}% UPM)",
                 indent_level=1,
             )
-            return False, indicator.build()
+            _note_old_os2(indicator, os2)
+            return ApplyStatus.PREVIEW, indicator.build()
 
         # Apply changes
         if os2:
@@ -151,30 +217,31 @@ def apply_metrics(fp: str, fm: FontMeasures, dry_run: bool) -> tuple[bool, str]:
             os2.sTypoAscender = int(typ_asc)
             os2.sTypoDescender = int(typ_desc)
             os2.sTypoLineGap = line_gap
-            try:
-                # Always update sxHeight and sCapHeight with measured values
-                # This ensures OS/2 metadata matches actual glyph measurements
-                if fm.x_height and fm.x_height > 0:
-                    os2.sxHeight = int(fm.x_height)
-                if fm.cap_height and fm.cap_height > 0:
-                    os2.sCapHeight = int(fm.cap_height)
-            except Exception:
-                pass
-            try:
-                if getattr(os2, "version", 0) >= 4:
-                    os2.fsSelection = int(getattr(os2, "fsSelection", 0) or 0) | (
-                        1 << 7
-                    )
-            except Exception:
-                pass
+            if "sxHeight" in new_vals:
+                os2.sxHeight = new_vals["sxHeight"]
+            if "sCapHeight" in new_vals:
+                os2.sCapHeight = new_vals["sCapHeight"]
+            if "fsSelection" in new_vals:
+                os2.fsSelection = new_vals["fsSelection"]
         if hhea:
             hhea.ascent = int(typ_asc)
             hhea.descent = int(typ_desc)
             hhea.lineGap = line_gap
 
         font.flavor = orig_flavor
-        font.save(fp)
+        # Write through a symlink to the real file, and replace that file only
+        # after the font handle is closed. Windows refuses to replace an open file.
+        real = os.path.realpath(fp)
+        tmp = f"{real}.ebrium-tmp"
+        if str(real).lower().endswith(".ttx"):
+            font.saveXML(tmp)
+        else:
+            font.save(tmp)
         font.close()
+        font = None
+        shutil.copymode(real, tmp)
+        os.replace(tmp, real)
+        tmp = None
 
         # Format UPM indicator if different from family majority
         upm_note = ""
@@ -197,6 +264,8 @@ def apply_metrics(fp: str, fm: FontMeasures, dry_run: bool) -> tuple[bool, str]:
                 "sTypoAscender",
                 "sTypoDescender",
                 "sTypoLineGap",
+                "sxHeight",
+                "sCapHeight",
                 "fsSelection",
             ]
         ]
@@ -228,40 +297,50 @@ def apply_metrics(fp: str, fm: FontMeasures, dry_run: bool) -> tuple[bool, str]:
                     f"{short_name}: {cs.fmt_change(str(old_vals.get(k, '—')), str(new_vals.get(k, '—')))}",
                     indent_level=1,
                 )
-        cs.emit("")
         indicator.add_item(
             f"[dim]vertical span:[/dim] {old_span} → {new_span} ({span_diff:+.1f}% UPM)",
             indent_level=1,
         )
 
+        _note_old_os2(indicator, os2)
         msg = indicator.build()
-        return True, msg
+        return ApplyStatus.UPDATED, msg
 
     except Exception as e:
+        if tmp and os.path.exists(tmp):
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
         indicator = (
             cs.StatusIndicator("error")
             .add_file(fp, filename_only=False)
             .with_explanation(str(e))
         )
-        return False, indicator.build()
+        return ApplyStatus.ERROR, indicator.build()
+    finally:
+        if font is not None:
+            try:
+                font.close()
+            except Exception:
+                pass
+        if tmp and os.path.exists(tmp):
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
 
 
 def process_all(measures, dry_run=False):
     updated = unchanged = errors = 0
     for fm in measures:
-        ok, msg = apply_metrics(fm.path, fm, dry_run=dry_run)
-        if dry_run:
-            if "UNCHANGED" in msg or "unchanged" in msg:
-                unchanged += 1
-            else:
-                updated += 1
+        status, msg = apply_metrics(fm.path, fm, dry_run=dry_run)
+        if status in (ApplyStatus.UPDATED, ApplyStatus.PREVIEW):
+            updated += 1
+        elif status is ApplyStatus.ERROR:
+            errors += 1
         else:
-            if ok:
-                updated += 1
-            elif "ERROR" in msg or "error" in msg:
-                errors += 1
-            else:
-                unchanged += 1
+            unchanged += 1
         cs.emit(msg, console=console)
 
     cs.emit("")

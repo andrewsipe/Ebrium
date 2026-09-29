@@ -14,14 +14,13 @@ from typing import Optional, TextIO
 from collections.abc import Sequence
 
 import FontCore.core_console_styles as cs
-from FontCore.core_console_styles import get_console
+from FontCore.core_console_styles import _escape_markup, get_console
 from FontCore.core_logging_config import Verbosity
-from fontTools.ttLib import TTFont
-
 from . import config
 from . import grouping
 from . import measurements
 from . import planning
+from .font_io import _read_ttfont
 from .models import FontMeasures
 from .variation_probe import (
     Survey,
@@ -63,7 +62,7 @@ class ProbeRow:
 
 def read_stored_metrics(path: str) -> Optional[StoredMetrics]:
     try:
-        font = TTFont(path)
+        font = _read_ttfont(path)
     except Exception:
         return None
     try:
@@ -111,6 +110,7 @@ def _planned_ascenders(group: Sequence[FontMeasures], cfg: MetricsConfig, mode: 
         cfg,
         verbosity=Verbosity.QUIET,
         grouping_mode=mode,
+        emit_review_report=False,
     )
     return {fm.path: fm.target_typo_asc for fm in group}
 
@@ -136,7 +136,7 @@ def order_group(
     surveys = {}
     for fm in group:
         try:
-            font = TTFont(fm.path)
+            font = _read_ttfont(fm.path)
         except Exception:
             surveys[fm.path] = None
             continue
@@ -289,7 +289,7 @@ DRIVER_STYLE = "bold magenta2"
 
 
 def _file_label(row: ProbeRow) -> str:
-    name = Path(row.measure.path).name
+    name = _escape_markup(Path(row.measure.path).name)
     if row.is_driver:
         return f"[{DRIVER_STYLE}]{name}[/{DRIVER_STYLE}]"
     return name
@@ -401,10 +401,13 @@ def _print_table(group: str, rows: list[ProbeRow], *, verbose: int) -> None:
     driver = next((row for row in rows if row.is_driver), rows[0])
     noun = "font" if verbose >= 1 else "style"
     noun += "" if len(rows) == 1 else "s"
+    driver_name = _escape_markup(Path(driver.measure.path).name)
     if verbose >= 1:
-        title = f"{group} — {len(rows)} {noun} — driver {Path(driver.measure.path).name}"
+        title = f"{_escape_markup(group)} — {len(rows)} {noun} — driver {driver_name}"
     else:
-        title = f"{group} — {len(rows)} {noun} — spacing set by {Path(driver.measure.path).name}"
+        title = (
+            f"{_escape_markup(group)} — {len(rows)} {noun} — spacing set by {driver_name}"
+        )
     no_cluster = any(row.nc_units is not None for row in rows)
     if verbose >= 2:
         headers = list(FULL_HEADERS)
@@ -436,7 +439,10 @@ def _print_table(group: str, rows: list[ProbeRow], *, verbose: int) -> None:
         cs.emit("[bold]Sliders[/bold]", console=console)
         for row in variable_rows:
             cs.emit("", console=console)
-            cs.emit(f"  [bold]{Path(row.measure.path).name}[/bold]", console=console)
+            cs.emit(
+                f"  [bold]{_escape_markup(Path(row.measure.path).name)}[/bold]",
+                console=console,
+            )
             for line in slider_lines(row.survey):
                 cs.emit(f"    {line}", console=console)
 

@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import unittest
+from types import SimpleNamespace
 
 from ebrium.cli_parser import build_parser, finalize_args
+from ebrium.validation import validate_args
 
 
 class ParserTest(unittest.TestCase):
@@ -27,6 +29,10 @@ class ParserTest(unittest.TestCase):
         custom = build_parser().parse_args(["--span", "120", "--line-gap", "5"])
         self.assertEqual(custom.span, 120)
         self.assertEqual(custom.line_gap, 5)
+        validate_args(SimpleNamespace(span=0))
+        with self.assertRaises(SystemExit) as caught:
+            validate_args(SimpleNamespace(span=-10))
+        self.assertEqual(caught.exception.code, 2)
         options = {
             opt
             for action in build_parser()._actions
@@ -48,6 +54,8 @@ class ParserTest(unittest.TestCase):
         help_text = build_parser().format_help()
         self.assertIn("--match", help_text)
         self.assertNotIn("--merge", help_text)
+        self.assertIn("keeps each file's current span", help_text)
+        self.assertIn("reuse a checkpoint", help_text)
 
 
 if __name__ == "__main__":

@@ -12,6 +12,10 @@ if TYPE_CHECKING:
 def _read_ttfont(path: str):
     from fontTools.ttLib import TTFont
 
+    if str(path).lower().endswith(".ttx"):
+        font = TTFont()
+        font.importXML(path)
+        return font
     return TTFont(path)
 
 

@@ -14,8 +14,13 @@ analyze_family_impact = planning.analyze_family_impact
 
 
 def validate_args(args: argparse.Namespace) -> None:
-    """Nothing left to second-guess. The plan is fixed."""
-    return
+    """Reject a negative span. Zero means keep the file's current span."""
+    span = getattr(args, "span", None)
+    if span is not None and span < 0:
+        cs.StatusIndicator("error").add_message(
+            "Span cannot be negative. Use 0 to keep each file's current span."
+        ).emit(console)
+        sys.exit(2)
 
 
 def confirm_or_exit(count: int) -> None:
@@ -56,25 +61,26 @@ def confirm_or_exit(count: int) -> None:
 
 def report_changes(families, plans, args, forced_groups) -> bool:
     """Report planned changes per family."""
-    any_changes_needed = False
+    impacts = {
+        fam: analyze_family_impact(families[fam]) for fam in plans
+    }
 
-    def get_impact_category(fam):
-        group = families[fam]
-        avg_typo, _avg_span, _num_fonts, has_changes = analyze_family_impact(group)
-        if not has_changes or avg_typo < 0.1:
+    def impact_rank(fam: str) -> tuple[int, str]:
+        typo_pct, _span, _count, has_changes = impacts[fam]
+        if not has_changes:
             return (0, fam)
-        elif avg_typo < 2.0:
+        if typo_pct < 2.0:
             return (1, fam)
-        elif avg_typo < 8.0:
+        if typo_pct < 8.0:
             return (2, fam)
-        else:
-            return (3, fam)
+        return (3, fam)
 
-    sorted_families = sorted(plans.items(), key=lambda x: get_impact_category(x[0]))
+    any_changes_needed = False
+    sorted_families = sorted(plans.items(), key=lambda item: impact_rank(item[0]))
 
     for fam, (_fam_min, _fam_max, _fam_asc) in sorted_families:
         group = families[fam]
-        avg_typo, avg_span, num_fonts, has_changes = analyze_family_impact(group)
+        typo_pct, span_pct, num_fonts, has_changes = impacts[fam]
 
         family_label = f"[bold]{fam}[/bold]"
         unique_names = set(fm.family_name for fm in group)
@@ -100,7 +106,7 @@ def report_changes(families, plans, args, forced_groups) -> bool:
         else:
             detail = ""
 
-        if not has_changes or avg_typo < 0.1:
+        if not has_changes:
             cs.StatusIndicator("info").add_message(
                 f"{family_label} — {cs.fmt_count(num_fonts)} {style_word} already {share_word} a plan{detail}"
             ).emit(console)
@@ -108,21 +114,21 @@ def report_changes(families, plans, args, forced_groups) -> bool:
 
         any_changes_needed = True
 
-        if avg_typo < 2.0:
+        if typo_pct < 2.0:
             impact_type = "minimal"
-        elif avg_typo < 8.0:
+        elif typo_pct < 8.0:
             impact_type = "moderate"
         else:
             impact_type = "major"
 
-        if abs(avg_span) < 1.0:
+        if abs(span_pct) < 1.0:
             span_info = "Line spacing stays about the same, gaps removed"
-        elif avg_span > 0:
-            span_info = f"Line spacing grows by ~[count]{avg_span:.0f}[/count]%, gaps removed"
+        elif span_pct > 0:
+            span_info = f"Line spacing grows by up to ~[count]{span_pct:.0f}[/count]%, gaps removed"
         else:
-            span_info = f"Line spacing shrinks by ~[count]{abs(avg_span):.0f}[/count]%, gaps removed"
+            span_info = f"Line spacing shrinks by up to ~[count]{abs(span_pct):.0f}[/count]%, gaps removed"
         if verbose >= 1:
-            span_info += f" (edges moved ~[count]{avg_typo:.0f}[/count]% of the em)"
+            span_info += f" (edges moved up to ~[count]{typo_pct:.0f}[/count]% of the em)"
 
         cs.StatusIndicator("info").add_message(
             f"{family_label} — {cs.fmt_count(num_fonts)} {style_word} matched, one shared plan{detail}"

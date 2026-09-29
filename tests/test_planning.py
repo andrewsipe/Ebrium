@@ -166,6 +166,20 @@ class PlanningFixtureTest(unittest.TestCase):
             )
             font.close()
 
+    def test_glyph_heights_win_over_stored_os2(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "FixtureSans-Regular.ttf"
+            _write_fixture(path, variable=False)
+            font = TTFont(str(path))
+            font["OS/2"].sxHeight = 111
+            font["OS/2"].sCapHeight = 222
+            font.save(str(path))
+            font.close()
+            fm = measure_fonts([str(path)])[0]
+            self.assertEqual(fm.x_height, 480)
+            self.assertEqual(fm.cap_height, 700)
+            self.assertEqual(fm.cap_optical, 700)
+
     def test_plan_typo_box_centers_then_applies_floors(self) -> None:
         asc, desc, exceeded = plan_typo_box(
             upm=1000,
@@ -191,6 +205,26 @@ class PlanningFixtureTest(unittest.TestCase):
         self.assertEqual(asc, 1000)
         self.assertEqual(desc, -400)
         self.assertTrue(exceeded)
+
+    def test_ttx_round_trip_and_a_nameless_file_uses_its_stem(self) -> None:
+        from ebrium.font_io import _read_ttfont
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "Nameless-Regular.ttf"
+            _write_fixture(path, variable=False)
+            font = TTFont(str(path))
+            font["name"].removeNames(nameID=16)
+            font["name"].removeNames(nameID=1)
+            ttx = Path(tmp) / "Nameless-Regular.ttx"
+            font.saveXML(str(ttx))
+            font.close()
+
+            opened = _read_ttfont(str(ttx))
+            self.assertEqual(opened["head"].unitsPerEm, 1000)
+            opened.close()
+
+            measures = measure_fonts([str(ttx)])
+            self.assertEqual(measures[0].family_name, "Nameless-Regular")
 
 
 if __name__ == "__main__":

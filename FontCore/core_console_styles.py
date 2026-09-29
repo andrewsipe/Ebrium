@@ -301,6 +301,15 @@ def fmt_count(value: int | str) -> str:
     return f"[count]{value}[/count]" if RICH_AVAILABLE else str(value)
 
 
+def _escape_markup(text: str) -> str:
+    """Keep brackets in a filename from being read as a Rich style tag."""
+    if not RICH_AVAILABLE:
+        return text
+    from rich.markup import escape
+
+    return escape(text)
+
+
 def fmt_file(path: str, filename_only: bool = True) -> str:
     """
     Format a file path with consistent styling.
@@ -313,11 +322,14 @@ def fmt_file(path: str, filename_only: bool = True) -> str:
         return Path(path).name if filename_only else path
 
     if filename_only:
-        return f"[file.name]{Path(path).name}[/file.name]"
-    else:
-        path_obj = Path(path)
-        parent = str(path_obj.parent) + "/" if path_obj.parent != Path(".") else ""
-        return f"[file.path]{parent}[/file.path][file.name]{path_obj.name}[/file.name]"
+        return f"[file.name]{_escape_markup(Path(path).name)}[/file.name]"
+
+    path_obj = Path(path)
+    parent = str(path_obj.parent) + "/" if path_obj.parent != Path(".") else ""
+    return (
+        f"[file.path]{_escape_markup(parent)}[/file.path]"
+        f"[file.name]{_escape_markup(path_obj.name)}[/file.name]"
+    )
 
 
 def fmt_file_compact(path: str) -> str:
@@ -543,18 +555,21 @@ class StatusIndicator:
         if style:
             # Apply custom style to the file path
             if filename_only:
-                filename = Path(filepath).name
+                filename = _escape_markup(Path(filepath).name)
                 if RICH_AVAILABLE:
                     self.context_parts.append(f"[{style}]{filename}[/{style}]")
                 else:
-                    self.context_parts.append(filename)
+                    self.context_parts.append(Path(filepath).name)
             else:
                 path_obj = Path(filepath)
                 parent = (
                     str(path_obj.parent) + "/" if path_obj.parent != Path(".") else ""
                 )
                 if RICH_AVAILABLE:
-                    full_path = f"[file.path]{parent}[/file.path][file.name]{path_obj.name}[/file.name]"
+                    full_path = (
+                        f"[file.path]{_escape_markup(parent)}[/file.path]"
+                        f"[file.name]{_escape_markup(path_obj.name)}[/file.name]"
+                    )
                     self.context_parts.append(f"[{style}]{full_path}[/{style}]")
                 else:
                     self.context_parts.append(filepath)

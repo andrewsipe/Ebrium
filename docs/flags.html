@@ -35,8 +35,8 @@
       <tbody>
         <tr><td><code>ebrium fonts/ -r</code></td><td>One centered line box per family. You confirm before anything is written.</td></tr>
         <tr><td><code>-n</code></td><td>Preview. Nothing is written.</td></tr>
-        <tr><td><code>-y</code></td><td>Skip the confirmation.</td></tr>
-        <tr><td><code>--span %</code></td><td>Letter-span floor (default 130). Tighter 120, looser 150.</td></tr>
+        <tr><td><code>-y</code></td><td>Reuse a checkpoint whose files are unchanged, and skip the confirmation.</td></tr>
+        <tr><td><code>--span %</code></td><td>Letter-span floor (default 130). 0 keeps each file's current span. Tighter 120, looser 150.</td></tr>
         <tr><td><code>--line-gap %</code></td><td>Extra space between lines (default 0). 5 is slightly looser.</td></tr>
         <tr><td><code>--no-cluster</code></td><td>One box from the family's outline extremes, so nothing clips.</td></tr>
         <tr><td><code>--match "Family A,Family B"</code></td><td>Pair family names that do not already group, so they share one line box. A filename form matches the same name: FamilyShort is Family Short. Repeat the flag for another pair.</td></tr>

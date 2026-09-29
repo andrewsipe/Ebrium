@@ -18,6 +18,13 @@ from . import models
 
 console = get_console()
 
+
+class MeasurementInterrupted(Exception):
+    """Measuring stopped early. ``measures`` is everything finished so far."""
+
+    def __init__(self, measures: list) -> None:
+        self.measures = measures
+
 # Import constants from config
 CAP_HEIGHT_GLYPHS = config.CAP_HEIGHT_GLYPHS
 U_LOWER_X = config.U_LOWER_X
@@ -40,24 +47,24 @@ _glyph_advance_widths = font_io._glyph_advance_widths
 FontMeasures = models.FontMeasures
 
 
-def _cap_height(font: TTFont) -> Optional[int]:
-    # Prefer OS/2.sCapHeight
+def _os2_height(font: TTFont, field: str) -> Optional[int]:
+    """Stored OS/2 height, used only when the glyphs cannot be measured."""
     try:
         os2 = font["OS/2"]
-        cap = int(getattr(os2, "sCapHeight", 0) or 0)
-        if cap and cap > 0:
-            return cap
+        value = int(getattr(os2, field, 0) or 0)
+        if value > 0:
+            return value
     except Exception:
         pass
-    # Fallback measure from 'H' or 'I'
-    upm = _get_upm(font)
-    for cp in CAP_HEIGHT_GLYPHS:
-        b = _codepoint_bounds(font, cp)
-        if b:
-            _, _, _, yMax = b
-            return int(round(yMax))
-    # Last resort heuristic
-    return int(round(upm * 0.7))
+    return None
+
+
+def _cap_height(font: TTFont) -> Optional[int]:
+    """Cap height from the uppercase outlines, then OS/2 if those glyphs are absent."""
+    measured = _get_cap_height_from_glyphs_robust(font)
+    if measured is not None:
+        return measured[0]
+    return _os2_height(font, "sCapHeight")
 
 
 def _cap_height_optical(font: TTFont) -> Optional[int]:
@@ -131,19 +138,11 @@ def _accented_cap_max(font: TTFont) -> tuple[Optional[int], bool]:
 
 
 def _x_height(font: TTFont) -> Optional[int]:
-    # Prefer OS/2.sxHeight
-    try:
-        os2 = font["OS/2"]
-        xh = int(getattr(os2, "sxHeight", 0) or 0)
-        if xh and xh > 0:
-            return xh
-    except Exception:
-        pass
-    # Fallback: measure 'x'
-    b = _codepoint_bounds(font, U_LOWER_X)
-    if b:
-        return int(round(b[3]))
-    return None
+    """x-height from the lowercase outlines, then OS/2 if those glyphs are absent."""
+    measured = _get_x_height_from_glyphs_robust(font)
+    if measured is not None:
+        return measured[0]
+    return _os2_height(font, "sxHeight")
 
 
 def _get_cap_height_from_glyphs(font: TTFont) -> Optional[int]:
@@ -405,148 +404,153 @@ def measure_fonts(
     with cs.create_progress_bar(console) as progress:
         task = progress.add_task("Measuring fonts...", total=len(files_to_measure))
 
-        for fp in files_to_measure:
-            progress.console.print(f"[dim]→ {Path(fp).name}[/dim]", end="\r")
-            try:
-                font = _read_ttfont(fp)
-            except Exception as e:
-                cs.StatusIndicator("error").add_file(
-                    fp, filename_only=False
-                ).with_explanation(f"failed to open: {e}").emit(console)
-                progress.advance(task)
-                continue
-
-            try:
-                upm = _get_upm(font)
-                fm = FontMeasures(fp, upm)
-
-                # Extract family name (prefer name ID 16, fallback to ID 1)
-                fam = None
+        try:
+            for fp in files_to_measure:
+                progress.console.print(f"[dim]→ {Path(fp).name}[/dim]", end="\r")
+                font = None
                 try:
-                    if "name" in font:
-                        name_tbl = font["name"]
-                        rec16 = name_tbl.getName(16, 3, 1, 0x409) or name_tbl.getName(
-                            16, 1, 0, 0
-                        )
-                        rec1 = name_tbl.getName(1, 3, 1, 0x409) or name_tbl.getName(
-                            1, 1, 0, 0
-                        )
-                        if rec16:
-                            fam = str(rec16.toUnicode())
-                        elif rec1:
-                            fam = str(rec1.toUnicode())
-                except Exception:
-                    pass
-                fm.family_name = (
-                    unicodedata.normalize("NFC", fam)
-                    if isinstance(fam, str)
-                    else "Unknown"
-                )
+                    font = _read_ttfont(fp)
+                except Exception as e:
+                    cs.StatusIndicator("error").add_file(
+                        fp, filename_only=False
+                    ).with_explanation(f"failed to open: {e}").emit(console)
+                    progress.advance(task)
+                    continue
 
-                # Measure bounds and metrics
-                overall = _font_overall_bounds(font)
-                if overall:
-                    fm.min_y = int(round(overall[0]))
-                    fm.max_y = int(round(overall[1]))
+                try:
+                    upm = _get_upm(font)
+                    fm = FontMeasures(fp, upm)
 
-                fm.cap_height = _cap_height(font)
-                fm.cap_optical = _cap_height_optical(font)
-                fm.ascender_max = _ascender_max(font)
-                fm.descender_min = _descender_min(font)
-                fm.x_height = _x_height(font)
-                accented_max, accented_missing = _accented_cap_max(font)
-                fm.accented_cap_max = accented_max
-                fm.accented_cap_missing = accented_missing
-                from .review import font_has_color_table
-
-                fm.is_color_font = font_has_color_table(font)
-
-                # Check if font name suggests unicase (fallback for fonts that don't match geometric pattern)
-                filename_hint = (
-                    "Unicase" in Path(fp).name or "unicase" in Path(fp).name.lower()
-                )
-                family_name_hint = (
-                    "unicase" in fm.family_name.lower() if fm.family_name else False
-                )
-
-                # For unicase detection, prefer robust glyph measurements over OS/2 metadata
-                # OS/2 metadata can be incorrect, especially for unicase fonts
-                x_measurement = _get_x_height_from_glyphs_robust(font)
-                cap_measurement = _get_cap_height_from_glyphs_robust(font)
-
-                # Create a temporary FontMeasures with glyph-based values for detection
-                if x_measurement is not None and cap_measurement is not None:
-                    x_median, x_min, x_max = x_measurement
-                    cap_median, cap_min, cap_max = cap_measurement
-
-                    # Use median values for detection (most representative)
-                    detection_fm = FontMeasures(fp, fm.upm)
-                    detection_fm.x_height = x_median
-                    detection_fm.cap_height = cap_median
-                    detection_fm.upm = fm.upm
-
-                    # Calculate overshoot (natural variation in glyph heights)
-                    x_variation = (x_max - x_min) / fm.upm if fm.upm > 0 else 0
-                    cap_variation = (cap_max - cap_min) / fm.upm if fm.upm > 0 else 0
-                    avg_variation = (x_variation + cap_variation) / 2.0
-
-                    # Adjust overshoot tolerance based on actual font variation
-                    # Fonts with more variation (e.g., decorative) need more tolerance
-                    overshoot_tolerance = max(0.03, avg_variation * 1.5)
-
-                    fm.is_unicase = is_unicase(
-                        detection_fm,
-                        threshold=unicase_threshold,
-                        overshoot_tolerance=overshoot_tolerance,
+                    # Extract family name (prefer name ID 16, fallback to ID 1)
+                    fam = None
+                    try:
+                        if "name" in font:
+                            name_tbl = font["name"]
+                            rec16 = name_tbl.getName(16, 3, 1, 0x409) or name_tbl.getName(
+                                16, 1, 0, 0
+                            )
+                            rec1 = name_tbl.getName(1, 3, 1, 0x409) or name_tbl.getName(
+                                1, 1, 0, 0
+                            )
+                            if rec16:
+                                fam = str(rec16.toUnicode())
+                            elif rec1:
+                                fam = str(rec1.toUnicode())
+                    except Exception:
+                        pass
+                    fm.family_name = (
+                        unicodedata.normalize("NFC", fam)
+                        if isinstance(fam, str) and fam.strip()
+                        else Path(fp).stem
                     )
-                else:
-                    # Fall back to simple glyph measurements if robust unavailable
-                    x_from_glyph = _get_x_height_from_glyphs(font)
-                    cap_from_glyph = _get_cap_height_from_glyphs(font)
-                    if x_from_glyph is not None and cap_from_glyph is not None:
+
+                    # Measure bounds and metrics
+                    overall = _font_overall_bounds(font)
+                    if overall:
+                        fm.min_y = int(round(overall[0]))
+                        fm.max_y = int(round(overall[1]))
+
+                    fm.cap_height = _cap_height(font)
+                    fm.cap_optical = _cap_height_optical(font)
+                    fm.ascender_max = _ascender_max(font)
+                    fm.descender_min = _descender_min(font)
+                    fm.x_height = _x_height(font)
+                    accented_max, accented_missing = _accented_cap_max(font)
+                    fm.accented_cap_max = accented_max
+                    fm.accented_cap_missing = accented_missing
+                    from .review import font_has_color_table
+
+                    fm.is_color_font = font_has_color_table(font)
+
+                    # Check if font name suggests unicase (fallback for fonts that don't match geometric pattern)
+                    filename_hint = (
+                        "Unicase" in Path(fp).name or "unicase" in Path(fp).name.lower()
+                    )
+                    family_name_hint = (
+                        "unicase" in fm.family_name.lower() if fm.family_name else False
+                    )
+
+                    # Unicase uses the same glyph samples as the stored heights, plus
+                    # their spread, so a decorative overshoot does not hide a unicase.
+                    x_measurement = _get_x_height_from_glyphs_robust(font)
+                    cap_measurement = _get_cap_height_from_glyphs_robust(font)
+
+                    # Create a temporary FontMeasures with glyph-based values for detection
+                    if x_measurement is not None and cap_measurement is not None:
+                        x_median, x_min, x_max = x_measurement
+                        cap_median, cap_min, cap_max = cap_measurement
+
+                        # Use median values for detection (most representative)
                         detection_fm = FontMeasures(fp, fm.upm)
-                        detection_fm.x_height = x_from_glyph
-                        detection_fm.cap_height = cap_from_glyph
+                        detection_fm.x_height = x_median
+                        detection_fm.cap_height = cap_median
                         detection_fm.upm = fm.upm
+
+                        # Calculate overshoot (natural variation in glyph heights)
+                        x_variation = (x_max - x_min) / fm.upm if fm.upm > 0 else 0
+                        cap_variation = (cap_max - cap_min) / fm.upm if fm.upm > 0 else 0
+                        avg_variation = (x_variation + cap_variation) / 2.0
+
+                        # Adjust overshoot tolerance based on actual font variation
+                        # Fonts with more variation (e.g., decorative) need more tolerance
+                        overshoot_tolerance = max(0.03, avg_variation * 1.5)
+
                         fm.is_unicase = is_unicase(
-                            detection_fm, threshold=unicase_threshold
+                            detection_fm,
+                            threshold=unicase_threshold,
+                            overshoot_tolerance=overshoot_tolerance,
                         )
                     else:
-                        # Fall back to OS/2-based values if glyph measurements unavailable
-                        fm.is_unicase = is_unicase(fm, threshold=unicase_threshold)
+                        # Fall back to simple glyph measurements if robust unavailable
+                        x_from_glyph = _get_x_height_from_glyphs(font)
+                        cap_from_glyph = _get_cap_height_from_glyphs(font)
+                        if x_from_glyph is not None and cap_from_glyph is not None:
+                            detection_fm = FontMeasures(fp, fm.upm)
+                            detection_fm.x_height = x_from_glyph
+                            detection_fm.cap_height = cap_from_glyph
+                            detection_fm.upm = fm.upm
+                            fm.is_unicase = is_unicase(
+                                detection_fm, threshold=unicase_threshold
+                            )
+                        else:
+                            # Fall back to OS/2-based values if glyph measurements unavailable
+                            fm.is_unicase = is_unicase(fm, threshold=unicase_threshold)
 
-                # Fallback: if geometric detection failed but name suggests unicase
-                if not fm.is_unicase and (filename_hint or family_name_hint):
-                    fm.is_unicase = True
+                    # Fallback: if geometric detection failed but name suggests unicase
+                    if not fm.is_unicase and (filename_hint or family_name_hint):
+                        fm.is_unicase = True
 
-                fm.is_script = is_script_font(
-                    fm,
-                    script_span_threshold=script_span_threshold,
-                    script_asymmetry_ratio=script_asymmetry_ratio,
-                    exclusion_margin=exclusion_margin,
-                )
-                temp_config = config.MetricsConfig(
-                    decorative_span_threshold=decorative_span_threshold,
-                    script_span_threshold=script_span_threshold,
-                    optical_threshold=exclusion_margin * 2.0,
-                )
-                fm.is_decorative_candidate = detect_decorative_standalone(
-                    fm, temp_config
-                )
-                fm.advance_widths = _glyph_advance_widths(
-                    font, UNIWIDTH_SAMPLE_CODEPOINTS
-                )
+                    fm.is_script = is_script_font(
+                        fm,
+                        script_span_threshold=script_span_threshold,
+                        script_asymmetry_ratio=script_asymmetry_ratio,
+                        exclusion_margin=exclusion_margin,
+                    )
+                    temp_config = config.MetricsConfig(
+                        decorative_span_threshold=decorative_span_threshold,
+                        script_span_threshold=script_span_threshold,
+                        optical_threshold=exclusion_margin * 2.0,
+                    )
+                    fm.is_decorative_candidate = detect_decorative_standalone(
+                        fm, temp_config
+                    )
+                    fm.advance_widths = _glyph_advance_widths(
+                        font, UNIWIDTH_SAMPLE_CODEPOINTS
+                    )
 
-                measures.append(fm)
-            except Exception as e:
-                cs.StatusIndicator("error").add_file(
-                    fp, filename_only=False
-                ).with_explanation(f"measure error: {e}").emit(console)
-            finally:
-                try:
-                    font.close()
-                except Exception:
-                    pass
-                progress.advance(task)
+                    measures.append(fm)
+                except Exception as e:
+                    cs.StatusIndicator("error").add_file(
+                        fp, filename_only=False
+                    ).with_explanation(f"measure error: {e}").emit(console)
+                finally:
+                    try:
+                        if font is not None:
+                            font.close()
+                    except Exception:
+                        pass
+                    progress.advance(task)
+        except KeyboardInterrupt:
+            raise MeasurementInterrupted(measures)
 
     return measures

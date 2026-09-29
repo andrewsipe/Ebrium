@@ -33,7 +33,7 @@
     <ol class="steps">
       <li>
         <span class="term">Measure</span>
-        Cap height, x-height, ascenders, descenders, the tallest accented capital, and glyph bounds — normalized by each font’s UPM.
+        Cap height, x-height, ascenders, descenders, the tallest accented capital, and glyph bounds — from the outlines, normalized by each font’s UPM. OS/2 <code>sCapHeight</code> and <code>sxHeight</code> are used only when those glyphs are missing.
       </li>
       <li>
         <span class="term">Separate</span>
@@ -41,11 +41,11 @@
       </li>
       <li>
         <span class="term">Plan</span>
-        Center capitals in the line box and grow to the span floor (<code>--span</code>, default 130) while staying centered. Lower the bottom only when a measured descender needs it. A tall accent stays in Win. Short and Tall under one family name share that box, centered on the tallest cap. The line gap is 0 unless <code>--line-gap</code> says otherwise. Win is the outline extremes plus 2% on the core styles. A layer or swash keeps that Win and may clip. A script can widen it. See <a href="concepts.html">Concepts</a>.
+        Center capitals in the line box and grow to the span floor (<code>--span</code>, default 130) while staying centered. <code>--span 0</code> leaves each file's ascender and descender as they are. Lower the bottom only when a measured descender needs it. A tall accent stays in Win. Short and Tall under one family name share that box, centered on the tallest cap. The line gap is 0 unless <code>--line-gap</code> says otherwise. Win is the outline extremes plus 2% on the core styles. A layer or swash keeps that Win and may clip. A script can widen it. See <a href="concepts.html">Concepts</a>.
       </li>
       <li>
         <span class="term">Apply</span>
-        Write metrics in place (unless <code>-n</code>). Enable <a href="https://learn.microsoft.com/en-us/typography/opentype/spec/os2#fsSelection"><code>USE_TYPO_METRICS</code></a> when OS/2 ≥ 4. <code>probe</code> does not write.
+        Write metrics in place (unless <code>-n</code>), including <code>sCapHeight</code> and <code>sxHeight</code> when the table is version 2 or newer and the outlines disagree. Enable <a href="https://learn.microsoft.com/en-us/typography/opentype/spec/os2#fsSelection"><code>USE_TYPO_METRICS</code></a> when OS/2 ≥ 4. An older table is not versioned, and the run says the bit is not set. <code>probe</code> does not write.
       </li>
     </ol>
 

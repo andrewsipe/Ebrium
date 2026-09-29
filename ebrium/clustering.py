@@ -344,9 +344,24 @@ def cluster_group_helper(
     core_clusters = [c for c in clusters_dict.values() if len(c) > 1]
     singletons = [c[0] for c in clusters_dict.values() if len(c) == 1]
 
-    # Find main cluster (largest)
+    # No pair was close enough to form a core. Measurement flags still apply:
+    # a script or decorative candidate must not set the family's typo box.
+    # The styles that remain each stay a cluster so the planner can share one box.
     if not core_clusters:
-        return ([], singletons, [])
+        scripts: list[FontMeasures] = []
+        decorative: list[FontMeasures] = list(peeled_effects)
+        kept: list[FontMeasures] = []
+        for fm in singletons:
+            if fm.is_script:
+                scripts.append(fm)
+                continue
+            if fm.is_decorative_candidate:
+                fm.is_decorative_outlier = True
+                fm.is_decorative_candidate = False
+                decorative.append(fm)
+                continue
+            kept.append(fm)
+        return ([[fm] for fm in kept], decorative, scripts)
 
     main_cluster = max(core_clusters, key=len)
 

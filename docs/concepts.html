@@ -31,7 +31,7 @@
     <p class="lede">Terms you’ll see in the CLI, the report, and the planned metrics. Skim once; come back when a flag name stops making sense.</p>
 
     <h2>Cap height (optical)</h2>
-    <p>The measured height of capital letters used as the <strong>anchor</strong> for the shared line box. Styles in one family share that height. Measurement prefers the outlines over table values that may be stale.</p>
+    <p>The measured height of capital letters used as the <strong>anchor</strong> for the shared line box. Styles in one family share that height. Cap height and x-height are taken from the outlines. Stored <code>sCapHeight</code> and <code>sxHeight</code> are used only when those glyphs are missing, and a run writes the outline measurements back when the OS/2 table is version 2 or newer. An older table cannot store those fields, so they are left alone.</p>
 
     <h2>Core and outliers</h2>
     <p>The core styles set one planned typo/hhea box. A layer or swash whose ink runs past a sibling keeps that box and may clip. A script keeps the line box, and Win can grow around the swashes. <code>--no-cluster</code> skips that plan and uses outline extremes for the line box instead.</p>
@@ -97,7 +97,7 @@
     <ul>
       <li>Typo and hhea are the same numbers. That is the line box.</li>
       <li>Both line gaps are 0 unless you pass <code>--line-gap</code>. The box itself is the line spacing.</li>
-      <li><code>USE_TYPO_METRICS</code> is on, so apps use that box instead of the Win values.</li>
+      <li><code>USE_TYPO_METRICS</code> is set when OS/2 is version 4 or newer, so apps use that box instead of the Win values. An older table is not versioned here, and the run says the bit is not set.</li>
       <li>Win is the clipping box. On the core styles it covers the outlines. A layer or swash keeps the core Win and may clip. A script can widen Win.</li>
       <li>Styles in a family share one line box, so switching weight or italic does not change the line spacing of a paragraph.</li>
     </ul>
@@ -106,7 +106,7 @@
     <p><a href="https://kltf.de/files/FontMetrics-kltf.pdf">Karsten Lücke’s font-metrics notes</a> are the history behind the older rule that the typo span had to equal the em. That rule is no longer in the spec, and the default 130% floor does not follow it.</p>
 
     <h2>Span and line gap</h2>
-    <p><code>--span</code> (default 130) is the letter-span floor, as a percent of the em. 120 is tighter, 150 is looser. A measured descender can still lower the box. <code>--line-gap</code> (default 0) adds space between lines, also as a percent of the em. 5 is slightly looser.</p>
+    <p><code>--span</code> (default 130) is the letter-span floor, as a percent of the em. 120 is tighter, 150 is looser. A measured descender can still lower that box. <code>0</code> leaves each file's ascender and descender as they are, and the line gap can still change. <code>--line-gap</code> (default 0) adds space between lines, also as a percent of the em. 5 is slightly looser.</p>
 
     <h2>Shared box</h2>
     <p>A run gives the core styles in a family one line box. <code>--match "Family A,Family B"</code> puts two families that do not already share a name onto that same box. <code>probe</code> shows how far each file’s stored ascender would move to match it. <code>--no-cluster</code> replaces that plan with one box from the family’s outline extremes.</p>
@@ -156,7 +156,7 @@
     <div class="callout warn">
       <strong>A cache file is written.</strong> Every measuring run, including <code>-n</code>, writes <code>.metrics_checkpoint.json</code> in the current working directory. <code>probe</code> does not write one.
     </div>
-    <p>The file caches measurements and clusters, and it resets when the options or the font set change.</p>
+    <p>The file caches measurements and clusters. A font is measured again when its size or modification time changes, or when the options or the file list change. <code>-y</code> reuses that cache only while each file still matches.</p>
   </main>
 
   <footer class="site-footer">

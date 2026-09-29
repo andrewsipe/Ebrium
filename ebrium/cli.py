@@ -32,6 +32,7 @@ FontMeasures = models.FontMeasures
 
 # Import functions from modules
 measure_fonts = measurements.measure_fonts
+MeasurementInterrupted = measurements.MeasurementInterrupted
 save_measurements_checkpoint = checkpoints.save_measurements_checkpoint
 load_measurements_checkpoint = checkpoints.load_measurements_checkpoint
 group_families = grouping.group_families
@@ -99,7 +100,7 @@ def main() -> None:
 
     # Convert percentage inputs to internal fraction representation
     config = MetricsConfig(
-        target_span=(args.span / 100.0) if args.span > 0 else 1.3,
+        target_span=args.span / 100.0,
         line_gap=(args.line_gap / 100.0) if args.line_gap > 0 else 0.0,
     )
 
@@ -181,9 +182,12 @@ def main() -> None:
                         ).emit(console)
                         prompt_msg = "Use checkpoint for matching fonts?"
 
-                    # Prompt user for checkpoint usage
+                    # -y reuses the checkpoint without asking.
                     cs.emit("", console=console)
-                    resp = cs.prompt_confirm(prompt_msg, default=True)
+                    if getattr(args, "yes", False):
+                        resp = True
+                    else:
+                        resp = cs.prompt_confirm(prompt_msg, default=True)
 
                     if resp:
                         measures = [
@@ -231,6 +235,18 @@ def main() -> None:
                 exclusion_margin=config.optical_threshold / 2.0,
                 decorative_span_threshold=config.decorative_span_threshold,
             )
+        except MeasurementInterrupted as stopped:
+            measures = stopped.measures
+            cs.emit("", console=console)
+            cs.StatusIndicator("warning").add_message(
+                "Measurement interrupted. Saving partial checkpoint..."
+            ).emit(console)
+            if measures:
+                save_measurements_checkpoint(measures, checkpoint_path, config=config)
+            cs.StatusIndicator("info").add_message(
+                f"Partial checkpoint saved to {checkpoint_path}"
+            ).emit(console)
+            sys.exit(0)
         except KeyboardInterrupt:
             cs.emit("", console=console)
             cs.StatusIndicator("warning").add_message(

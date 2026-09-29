@@ -17,6 +17,22 @@ The command groups by family name and writes one centered line box.
   A color font family with a color table copies one box across its files.
   `--match` treats a filename form as the same family name: FamilyShort
   is Family Short.
+- A family with no shared core still gets its line gap and still appears in
+  the change report. The report follows the largest per-font move, so one
+  changed style is not averaged away. Stopping a measurement keeps the fonts
+  already measured.
+- A family whose styles do not cluster still shares one line box, centered
+  on the tallest cap. An ordinary weight spread inside one cluster does not.
+  A font with no readable family name is grouped by its filename.
+  `--use-ttx` reads and writes `.ttx` XML.
+- Cap height and x-height come from the outlines. `sCapHeight` and `sxHeight`
+  are updated when they disagree and the OS/2 table is version 2 or newer.
+  Use Typo Metrics is set only on version 4 or newer. An older table is left
+  alone, and the run says the bit is not set.
+- `--span 0` keeps each file's current ascender and descender. The line gap
+  still follows `--line-gap`.
+- `-y` reuses a checkpoint only while each file's size and modification time
+  still match, and it skips the confirmation.
 - A Review block lists only what is worth a look. It does not change the plan.
   A script or layer that leaves the shared box is listed with how much
   the line box would have moved if that file had stayed.

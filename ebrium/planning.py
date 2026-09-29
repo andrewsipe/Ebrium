@@ -4,13 +4,14 @@ from pathlib import Path
 from typing import Optional
 
 import FontCore.core_console_styles as cs
-from FontCore.core_console_styles import get_console
+from FontCore.core_console_styles import _escape_markup, get_console
 from FontCore.core_logging_config import Verbosity
 
 from . import clustering
 from . import config
 from . import font_io
 from . import models
+from .application import _or_old, measured_os2_heights
 from .review import emit_review, review_notes, stamp_layered_metrics
 
 console = get_console()
@@ -192,6 +193,11 @@ def plan_typo_box(
         cap = int(round(0.7 * upm))
 
     typo_asc = int(typo_asc_seed)
+    # A floor of 0 means the file keeps the span it already has. The caller
+    # drops these targets so nothing here is written.
+    if target_span_norm <= 0:
+        desired_desc = compute_descender_for_centering(typo_asc, cap, actual_desc=None)
+        return typo_asc, desired_desc, False
     # Center only — do not deepen to ink yet (that is a measured floor below).
     desired_desc = compute_descender_for_centering(typo_asc, cap, actual_desc=None)
 
@@ -212,6 +218,11 @@ def plan_typo_box(
     return typo_asc, desired_desc, exceeded
 
 
+def _shown_name(path: str) -> str:
+    """A filename safe to place inside a Rich message."""
+    return _escape_markup(Path(path).name)
+
+
 def cap_norm(fm: FontMeasures) -> Optional[float]:
     """Cap height as a fraction of the em."""
     cap = fm.cap_optical or fm.cap_height
@@ -227,7 +238,8 @@ def family_cap_anchor(
 ) -> Optional[float]:
     """Tallest cap in the family, when the heights are not one cluster.
 
-    Short, Normal, and Tall in one family share the tall cap's line box.
+    Short, Normal, and Tall in one family share the tall cap's line box,
+    including when no two styles were close enough to form a core cluster.
     A single height keeps the usual plan.
     """
     fonts = [
@@ -241,9 +253,15 @@ def family_cap_anchor(
     if len(ratios) < 2:
         return None
     tallest = max(ratios)
-    core = [ratio for fm in main_cluster if (ratio := cap_norm(fm)) is not None]
-    core_cap = max(core) if core else tallest
-    if tallest - core_cap <= config.optical_threshold:
+    # A real core cluster is one linkage group. Compare the tallest cap in the
+    # family with that group's tallest, so a few percent of weight drift does
+    # not look like Short / Tall. Tallest against shortest is only for a family
+    # that never formed a core.
+    if main_cluster and len(main_cluster) > 1:
+        core = [ratio for fm in main_cluster if (ratio := cap_norm(fm)) is not None]
+        if not core or tallest - max(core) <= config.optical_threshold:
+            return None
+    elif tallest - min(ratios) <= config.optical_threshold:
         return None
     return tallest
 
@@ -421,9 +439,12 @@ def plan_safe_metrics(group: list[FontMeasures], config: MetricsConfig) -> None:
         finalize_metrics(fm)
 
 
-def validate_cluster_consistency(cluster: list[FontMeasures]) -> None:
+def validate_cluster_consistency(
+    cluster: list[FontMeasures],
+    verbosity: Verbosity = Verbosity.BRIEF,
+) -> None:
     """Validate that cluster fonts have identical normalized typo ratios."""
-    if len(cluster) <= 1:
+    if verbosity < Verbosity.BRIEF or len(cluster) <= 1:
         return
     asc_ratios = [
         fm.target_typo_asc / fm.upm
@@ -503,19 +524,20 @@ def analyze_family_impact(
 ) -> tuple[float, float, int, bool]:
     """Analyze the impact of planned changes.
 
-    Returns: (avg_typo_change_pct, avg_span_change_pct, num_fonts, has_any_changes)
+    Returns the largest per-font typo move as a percent of the em, the span
+    change for that same font, the font count, and whether anything differs.
     """
-    typo_changes: list[float] = []
-    span_changes: list[float] = []
+    span_at_largest = 0.0
+    largest_typo = 0.0
     has_any_changes = False
 
     for fm in measures:
+        font = None
         try:
             font = _read_ttfont(fm.path)
             os2 = font.get("OS/2")
             hhea = font.get("hhea")
             if not os2:
-                font.close()
                 continue
 
             old_typo_asc = int(getattr(os2, "sTypoAscender", 0) or 0)
@@ -529,12 +551,17 @@ def analyze_family_impact(
             old_hhea_desc = int(getattr(hhea, "descent", 0) or 0) if hhea else 0
             old_hhea_gap = int(getattr(hhea, "lineGap", 0) or 0) if hhea else 0
 
-            new_typo_asc = fm.target_typo_asc or old_typo_asc
-            new_typo_desc = fm.target_typo_desc or old_typo_desc
-            new_win_asc = fm.target_win_asc or old_win_asc
-            new_win_desc = fm.target_win_desc or old_win_desc
+            new_typo_asc = _or_old(fm.target_typo_asc, old_typo_asc)
+            new_typo_desc = _or_old(fm.target_typo_desc, old_typo_desc)
+            new_win_asc = _or_old(fm.target_win_asc, old_win_asc)
+            new_win_desc = _or_old(fm.target_win_desc, old_win_desc)
             new_span = new_typo_asc + abs(new_typo_desc)
-            new_gap = int(getattr(fm, "target_line_gap", 0) or 0)
+            new_gap = _or_old(getattr(fm, "target_line_gap", None), old_typo_gap)
+            stored_heights = {
+                "sxHeight": int(getattr(os2, "sxHeight", 0) or 0),
+                "sCapHeight": int(getattr(os2, "sCapHeight", 0) or 0),
+            }
+            height_updates = measured_os2_heights(fm, os2)
 
             if (
                 old_typo_asc != new_typo_asc
@@ -545,28 +572,37 @@ def analyze_family_impact(
                 or old_hhea_gap != new_gap
                 or old_hhea_asc != new_typo_asc
                 or old_hhea_desc != new_typo_desc
+                or any(
+                    stored_heights[name] != value
+                    for name, value in height_updates.items()
+                )
             ):
                 has_any_changes = True
 
             if old_span > 0:
                 span_change_pct = ((new_span - old_span) / float(old_span)) * 100.0
-                span_changes.append(span_change_pct)
+            else:
+                span_change_pct = 0.0
 
             typo_change = abs(new_typo_asc - old_typo_asc) + abs(
                 new_typo_desc - old_typo_desc
             )
-            if fm.upm > 0:
-                typo_change_pct = (typo_change / float(fm.upm)) * 100.0
-                typo_changes.append(typo_change_pct)
-
-            font.close()
+            typo_change_pct = (
+                (typo_change / float(fm.upm)) * 100.0 if fm.upm > 0 else 0.0
+            )
+            if typo_change_pct >= largest_typo:
+                largest_typo = typo_change_pct
+                span_at_largest = span_change_pct
         except Exception:
             continue
+        finally:
+            if font is not None:
+                try:
+                    font.close()
+                except Exception:
+                    pass
 
-    avg_typo = sum(typo_changes) / len(typo_changes) if typo_changes else 0.0
-    avg_span = sum(span_changes) / len(span_changes) if span_changes else 0.0
-
-    return (avg_typo, avg_span, len(measures), has_any_changes)
+    return (largest_typo, span_at_largest, len(measures), has_any_changes)
 
 
 
@@ -592,13 +628,21 @@ def build_plans(
     review: dict[str, list[str]] = review_sink if review_sink is not None else {}
 
     def _close(name: str, fonts: list[FontMeasures]) -> None:
-        stamp_layered_metrics(fonts, config)
+        if config.target_span > 0:
+            stamp_layered_metrics(fonts, config)
+        else:
+            # --span 0 keeps each file's typo ascender and descender.
+            for fm in fonts:
+                fm.target_typo_asc = None
+                fm.target_typo_desc = None
+                fm.span_exceeded_target = False
         gap = float(getattr(config, "line_gap", 0.0) or 0.0)
         for fm in fonts:
             fm.target_line_gap = int(round(gap * fm.upm)) if fm.upm > 0 else 0
         review[name] = review_notes(fonts, config)
 
     for fam, group in families.items():
+        shown = _escape_markup(fam)
         # Compute UPM majority for status reporting
         upm_counts: dict[int, int] = {}
         for fm in group:
@@ -618,15 +662,16 @@ def build_plans(
             if is_uni:
                 for fm in group:
                     fm.is_uniwidth = True
+                if verbosity >= Verbosity.BRIEF:
+                    cs.StatusIndicator("info").add_message(
+                        f"[field]Family:[/field] '{shown}' — "
+                        f"[bold]Uniwidth detected:[/bold] {uni_score:.0%} consistency "
+                        f"({cs.fmt_count(uni_consistent)}/{cs.fmt_count(uni_total)} glyphs identical "
+                        f"across {cs.fmt_count(len(group))} fonts)"
+                    ).emit(console)
+            elif uni_total > 0 and uni_score >= 0.50 and verbosity >= Verbosity.BRIEF:
                 cs.StatusIndicator("info").add_message(
-                    f"[field]Family:[/field] '{fam}' — "
-                    f"[bold]Uniwidth detected:[/bold] {uni_score:.0%} consistency "
-                    f"({cs.fmt_count(uni_consistent)}/{cs.fmt_count(uni_total)} glyphs identical "
-                    f"across {cs.fmt_count(len(group))} fonts)"
-                ).emit(console)
-            elif uni_total > 0 and uni_score >= 0.50:
-                cs.StatusIndicator("info").add_message(
-                    f"[field]Family:[/field] '{fam}' — "
+                    f"[field]Family:[/field] '{shown}' — "
                     f"[bold]Partial uniwidth:[/bold] {uni_score:.0%} consistency "
                     f"({cs.fmt_count(uni_consistent)}/{cs.fmt_count(uni_total)} glyphs identical) — "
                     f"may contain distinct width classes"
@@ -647,11 +692,11 @@ def build_plans(
         unicase_count = sum(1 for fm in group if fm.is_unicase)
         non_unicase_count = len(group) - unicase_count
         if unicase_count > 0:
-            unicase_names = [Path(fm.path).name for fm in group if fm.is_unicase]
+            unicase_names = [_shown_name(fm.path) for fm in group if fm.is_unicase]
             if non_unicase_count > 0:
                 # Mixed family: unicase will inherit baseline from traditional
                 indicator = cs.StatusIndicator("info").add_message(
-                    f"[field]Family:[/field] '{fam}' — "
+                    f"[field]Family:[/field] '{shown}' — "
                     f"[bold]Unicase detected:[/bold] {cs.fmt_count(unicase_count)} unicase font(s) "
                     f"mixed with {cs.fmt_count(non_unicase_count)} traditional font(s)"
                 )
@@ -663,11 +708,12 @@ def build_plans(
                 indicator.add_item(
                     "Unicase fonts will inherit baseline from traditional fonts for alignment",
                     indent_level=1,
-                ).emit(console)
-            else:
-                # Pure unicase family: will cluster normally
+                )
+                if verbosity >= Verbosity.BRIEF:
+                    indicator.emit(console)
+            elif verbosity >= Verbosity.BRIEF:
                 cs.StatusIndicator("info").add_message(
-                    f"[field]Family:[/field] '{fam}' — "
+                    f"[field]Family:[/field] '{shown}' — "
                     f"[bold]Pure unicase family:[/bold] {cs.fmt_count(unicase_count)} font(s) "
                     f"(x-height ≈ cap-height, clustering normally)"
                 ).emit(console)
@@ -677,9 +723,10 @@ def build_plans(
 
         # Level 2: Detect optical clusters (always enabled)
         if len(group) > 1:
+            no_core_shared = False
             if verbosity >= Verbosity.DEBUG:
                 cs.StatusIndicator("info").add_message(
-                    f"[field]Family:[/field] '{fam}' — "
+                    f"[field]Family:[/field] '{shown}' — "
                     f"[dim]DEBUG:[/dim] Detecting optical clusters from {len(group)} font(s)"
                 ).emit(console)
             # Check for cached clusters first
@@ -746,7 +793,7 @@ def build_plans(
                     # Paths don't match - invalidate cache and recompute
                     if verbosity >= Verbosity.DEBUG:
                         cs.StatusIndicator("info").add_message(
-                            f"Cluster cache invalid for '{fam}' (file set changed) - reclustering"
+                            f"Cluster cache invalid for '{shown}' (file set changed) - reclustering"
                         ).emit(console)
                     family_clusters = None
                     main_cluster = []
@@ -760,7 +807,7 @@ def build_plans(
                 main_cluster = max(clusters, key=len) if clusters else []
             else:
                 # Using cached clusters - main_cluster already set during reconstruction
-                pass
+                no_core_shared = bool(family_clusters.get("no_core"))
 
             # Report clustering results (main_cluster is now defined in both paths)
 
@@ -801,17 +848,18 @@ def build_plans(
                     ratio_text = "2x+ span, descender-dominant"
 
                 indicator = cs.StatusIndicator("info").add_message(
-                    f"[field]Family:[/field] '{fam}' — "
+                    f"[field]Family:[/field] '{shown}' — "
                     f"[bold]Script detector:[/bold] {cs.fmt_count(len(script_outliers))} font(s) "
                     f"({ratio_text})"
                 )
                 if verbosity >= Verbosity.VERBOSE:
-                    script_names = [Path(fm.path).name for fm in script_outliers]
+                    script_names = [_shown_name(fm.path) for fm in script_outliers]
                     indicator.add_item(
                         f"Detected as script: {', '.join(script_names[:5])}{'...' if len(script_names) > 5 else ''}",
                         indent_level=1,
                     )
-                indicator.emit(console)
+                if verbosity >= Verbosity.BRIEF:
+                    indicator.emit(console)
 
             # Decorative detection: expanded bounds, core metrics match (but not script/unicase)
             other_decorative = [
@@ -836,11 +884,12 @@ def build_plans(
                             ratios.append((fm.max_y - fm.min_y) / fm.upm / avg_cluster_span)
                     if ratios:
                         span_note = f", span {min(ratios):.2f}–{max(ratios):.2f}× the core"
-                cs.StatusIndicator("info").add_message(
-                    f"[field]Family:[/field] '{fam}' — "
-                    f"{cs.fmt_count(len(other_decorative))} style(s) inherit the core line box"
-                    f"{span_note}"
-                ).emit(console)
+                if verbosity >= Verbosity.BRIEF:
+                    cs.StatusIndicator("info").add_message(
+                        f"[field]Family:[/field] '{shown}' — "
+                        f"{cs.fmt_count(len(other_decorative))} style(s) inherit the core line box"
+                        f"{span_note}"
+                    ).emit(console)
 
             # Unicase detection: x-height ≈ cap-height
             unicase_in_clusters = sum(
@@ -853,13 +902,13 @@ def build_plans(
                 total_unicase = unicase_in_clusters + unicase_in_decorative
                 if unicase_in_decorative > 0:
                     indicator = cs.StatusIndicator("info").add_message(
-                        f"[field]Family:[/field] '{fam}' — "
+                        f"[field]Family:[/field] '{shown}' — "
                         f"[bold]Unicase detector:[/bold] {cs.fmt_count(total_unicase)} font(s) "
                         f"(x-height ≈ cap-height) - separated for baseline alignment"
                     )
                     if verbosity >= Verbosity.VERBOSE:
                         unicase_names = [
-                            Path(fm.path).name
+                            _shown_name(fm.path)
                             for fm in decorative_outliers
                             if fm.is_unicase
                         ]
@@ -867,7 +916,8 @@ def build_plans(
                             f"Detected as unicase: {', '.join(unicase_names[:5])}{'...' if len(unicase_names) > 5 else ''}",
                             indent_level=1,
                         )
-                    indicator.emit(console)
+                    if verbosity >= Verbosity.BRIEF:
+                        indicator.emit(console)
 
             # Level 3: Compute typo baseline from CORE CLUSTER only (not decorative outliers)
             if main_cluster:
@@ -875,7 +925,7 @@ def build_plans(
             else:
                 core_asc = compute_family_normalized_ascender(group, config)
 
-            if len(main_cluster) > 1:
+            if len(main_cluster) > 1 and not no_core_shared:
                 # Get UPM info
                 upms = {fm.upm for fm in main_cluster}
                 if len(upms) == 1:
@@ -921,7 +971,7 @@ def build_plans(
                         upm_info = f"[warning]Mixed UPM: {upm_list}[/warning]"
 
                 cluster_msg = (
-                    f"[field]Family:[/field] '{fam}' — "
+                    f"[field]Family:[/field] '{shown}' — "
                     f"Core cluster: {cs.fmt_count(len(main_cluster))} fonts"
                 )
                 if verbosity >= Verbosity.VERBOSE:
@@ -938,11 +988,11 @@ def build_plans(
 
                 if unicase_outliers:
                     indicator = cs.StatusIndicator("info").add_message(
-                        f"[field]Family:[/field] '{fam}' — "
+                        f"[field]Family:[/field] '{shown}' — "
                         f"[bold]Unicase baseline preservation:[/bold] {cs.fmt_count(len(unicase_outliers))} font(s)"
                     )
                     if verbosity >= Verbosity.VERBOSE:
-                        outlier_names = [Path(fm.path).name for fm in unicase_outliers]
+                        outlier_names = [_shown_name(fm.path) for fm in unicase_outliers]
                         indicator.add_item(
                             f"Unicase fonts: {', '.join(outlier_names[:5])}{'...' if len(outlier_names) > 5 else ''}",
                             indent_level=1,
@@ -950,79 +1000,130 @@ def build_plans(
                     indicator.add_item(
                         "Aligned by x-height (not cap-height) to maintain baseline alignment with traditional fonts",
                         indent_level=1,
-                    ).emit(console)
+                    )
+                    if verbosity >= Verbosity.BRIEF:
+                        indicator.emit(console)
 
             # Report script font handling (already reported detection above, this is for processing)
             if script_outliers and verbosity >= Verbosity.VERBOSE:
                 cs.StatusIndicator("info").add_message(
-                    f"[field]Family:[/field] '{fam}' — "
+                    f"[field]Family:[/field] '{shown}' — "
                     f"Script fonts will inherit core typo metrics and expand win bounds with {config.script_win_buffer_multiplier}x buffer"
                 ).emit(console)
 
+            # No optical core: one shared plan. Scripts and decorative candidates
+            # stay out of that plan. Remember the split so a later run still
+            # anchors on the tallest cap instead of treating the share as a core.
+            if not no_core_shared and (not main_cluster or len(main_cluster) < 2):
+                kept_fonts: list[FontMeasures] = []
+                for cluster in clusters:
+                    for fm in cluster:
+                        if fm.is_script:
+                            if fm not in script_outliers:
+                                script_outliers.append(fm)
+                        elif fm.is_decorative_candidate and not fm.is_unicase:
+                            fm.is_decorative_outlier = True
+                            if fm not in decorative_outliers:
+                                decorative_outliers.append(fm)
+                        else:
+                            kept_fonts.append(fm)
+                if len(kept_fonts) >= 2:
+                    clusters = [kept_fonts]
+                    main_cluster = kept_fonts
+                    core_asc = compute_family_normalized_ascender(kept_fonts, config)
+                else:
+                    clusters = [[fm] for fm in kept_fonts]
+                    main_cluster = list(kept_fonts)
+                no_core_shared = True
+
             # Level 4: Apply normalization per cluster.
             # Several heights in one family share the tallest cap's line box.
-            cap_anchor = family_cap_anchor(group, main_cluster, config)
-            if cap_anchor is not None and verbosity >= Verbosity.BRIEF:
+            cap_anchor = family_cap_anchor(
+                group, [] if no_core_shared else main_cluster, config
+            )
+            if (
+                cap_anchor is not None
+                and config.target_span > 0
+                and verbosity >= Verbosity.BRIEF
+            ):
                 cs.StatusIndicator("info").add_message(
-                    f"[field]Family:[/field] '{fam}' — "
+                    f"[field]Family:[/field] '{shown}' — "
                     f"heights share one line box, centered on the tallest cap"
                 ).emit(console)
             if verbosity >= Verbosity.DEBUG:
                 cs.StatusIndicator("info").add_message(
-                    f"[field]Family:[/field] '{fam}' — "
+                    f"[field]Family:[/field] '{shown}' — "
                     f"[dim]DEBUG:[/dim] Level 4: Processing {len(clusters)} cluster(s)"
                 ).emit(console)
-            for cluster in clusters:
-                # Skip decorative outliers if they somehow ended up in clusters
-                cluster_fonts = [
-                    fm
-                    for fm in cluster
-                    if not getattr(fm, "is_decorative_outlier", False)
-                ]
-                decorative_in_cluster = [
-                    fm for fm in cluster if getattr(fm, "is_decorative_outlier", False)
-                ]
-                if decorative_in_cluster and verbosity >= Verbosity.DEBUG:
-                    decorative_names = [
-                        Path(fm.path).name for fm in decorative_in_cluster
+            shared_fonts = [
+                fm
+                for cluster in clusters
+                for fm in cluster
+                if not getattr(fm, "is_decorative_outlier", False)
+            ]
+            if cap_anchor is not None and len(shared_fonts) > 1:
+                core_asc = compute_family_normalized_ascender(shared_fonts, config)
+                plan_identical_metrics(
+                    shared_fonts,
+                    fam_min,
+                    fam_max,
+                    core_asc,
+                    config,
+                    verbosity,
+                    cap_anchor=cap_anchor,
+                )
+            else:
+                for cluster in clusters:
+                    # Skip decorative outliers if they somehow ended up in clusters
+                    cluster_fonts = [
+                        fm
+                        for fm in cluster
+                        if not getattr(fm, "is_decorative_outlier", False)
                     ]
-                    cs.StatusIndicator("warning").add_message(
-                        f"[field]Family:[/field] '{fam}' — "
-                        f"WARNING: Decorative fonts found in clusters (should not happen): {', '.join(decorative_names)}"
-                    ).emit(console)
-                if not cluster_fonts:
-                    continue  # Skip clusters that only contain decorative outliers
+                    decorative_in_cluster = [
+                        fm for fm in cluster if getattr(fm, "is_decorative_outlier", False)
+                    ]
+                    if decorative_in_cluster and verbosity >= Verbosity.DEBUG:
+                        decorative_names = [
+                            _shown_name(fm.path) for fm in decorative_in_cluster
+                        ]
+                        cs.StatusIndicator("warning").add_message(
+                            f"[field]Family:[/field] '{shown}' — "
+                            f"WARNING: Decorative fonts found in clusters (should not happen): {', '.join(decorative_names)}"
+                        ).emit(console)
+                    if not cluster_fonts:
+                        continue  # Skip clusters that only contain decorative outliers
 
-                if len(cluster_fonts) > 1:
-                    # Core cluster: identical metrics (normalized across UPMs)
-                    plan_identical_metrics(
-                        cluster_fonts,
-                        fam_min,
-                        fam_max,
-                        core_asc,
-                        config,
-                        verbosity,
-                        cap_anchor=cap_anchor,
-                    )
-                else:
-                    # True outlier: compute own ascender (don't use main cluster's)
-                    outlier_asc = compute_family_normalized_ascender(
-                        cluster_fonts, config
-                    )
-                    plan_adaptive_metrics(
-                        cluster_fonts,
-                        fam_min,
-                        fam_max,
-                        outlier_asc,
-                        config,
-                        verbosity,
-                        cap_anchor=cap_anchor,
-                    )
+                    if len(cluster_fonts) > 1:
+                        # Core cluster: identical metrics (normalized across UPMs)
+                        plan_identical_metrics(
+                            cluster_fonts,
+                            fam_min,
+                            fam_max,
+                            core_asc,
+                            config,
+                            verbosity,
+                            cap_anchor=cap_anchor,
+                        )
+                    else:
+                        # True outlier: compute own ascender (don't use main cluster's)
+                        outlier_asc = compute_family_normalized_ascender(
+                            cluster_fonts, config
+                        )
+                        plan_adaptive_metrics(
+                            cluster_fonts,
+                            fam_min,
+                            fam_max,
+                            outlier_asc,
+                            config,
+                            verbosity,
+                            cap_anchor=cap_anchor,
+                        )
 
             # Level 5: FINALIZE: Ensure Win >= Typo for ALL fonts (before decorative inheritance)
             if verbosity >= Verbosity.DEBUG:
                 cs.StatusIndicator("info").add_message(
-                    f"[field]Family:[/field] '{fam}' — "
+                    f"[field]Family:[/field] '{shown}' — "
                     f"[dim]DEBUG:[/dim] Level 5: Finalizing metrics for {len(group)} font(s)"
                 ).emit(console)
             for fm in group:
@@ -1032,7 +1133,7 @@ def build_plans(
             if decorative_outliers:
                 if verbosity >= Verbosity.DEBUG:
                     cs.StatusIndicator("info").add_message(
-                        f"[field]Family:[/field] '{fam}' — "
+                        f"[field]Family:[/field] '{shown}' — "
                         f"[dim]DEBUG:[/dim] Level 7: Processing {len(decorative_outliers)} decorative outlier(s)"
                     ).emit(console)
                 # Use main_cluster as typo source (fallback handled in max-pull path)
@@ -1045,7 +1146,7 @@ def build_plans(
                     inherited_desc = int(round(norm_typo_desc * typo_source[0].upm))
                     if verbosity >= Verbosity.DEBUG:
                         cs.StatusIndicator("info").add_message(
-                            f"[field]Family:[/field] '{fam}' — "
+                            f"[field]Family:[/field] '{shown}' — "
                             f"inherited line box {inherited_asc} / {inherited_desc}"
                         ).emit(console)
                 else:
@@ -1062,9 +1163,11 @@ def build_plans(
                             config,
                             verbosity,
                         )
-                    continue  # Skip the inherited typo logic below
+                        finalize_metrics(fm)
 
                 for fm in decorative_outliers:
+                    if not typo_source:
+                        break
                     # SPECIAL HANDLING FOR UNICASE: Inherit traditional metrics directly
                     if fm.is_unicase and typo_source:
                         # Unicase: Just inherit traditional typo metrics directly
@@ -1125,6 +1228,7 @@ def build_plans(
                             config,
                             verbosity,
                         )
+                        finalize_metrics(fm)
                     # Skip inherited typo logic below
                     script_outliers = []
 
@@ -1155,7 +1259,7 @@ def build_plans(
 
             # Level 8: VALIDATE: Check cluster consistency
             if main_cluster and len(main_cluster) > 1:
-                validate_cluster_consistency(main_cluster)
+                validate_cluster_consistency(main_cluster, verbosity)
         else:
             # Single font family: compute ascender and use adaptive
             core_asc = compute_family_normalized_ascender(group, config)
@@ -1183,10 +1287,11 @@ def build_plans(
                 "script": [fm.path for fm in script_outliers],
                 "unicase": [fm.path for fm in group if fm.is_unicase],
                 "is_uniwidth": any(fm.is_uniwidth for fm in group),
+                "no_core": no_core_shared,
             }
 
         _close(fam, group)
 
-    if emit_review_report:
+    if emit_review_report and verbosity >= Verbosity.BRIEF:
         emit_review(review)
     return family_plans, clusters_cache
