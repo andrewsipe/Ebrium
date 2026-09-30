@@ -22,6 +22,12 @@ def _fm(name: str, cap: int) -> FontMeasures:
 
 
 class HeightFamilyTest(unittest.TestCase):
+    def test_a_shorter_cluster_anchors_when_the_core_is_already_tall(self) -> None:
+        tall = [_fm(f"Height-Tall{i}", 1225) for i in range(3)]
+        short = [_fm(f"Height-Short{i}", 700) for i in range(3)]
+        anchor = family_cap_anchor(tall + short, tall, MetricsConfig())
+        self.assertAlmostEqual(anchor, 1225 / 1750)
+
     def test_tallest_cap_is_the_anchor(self) -> None:
         short = [_fm(f"Height-Short{i}", 700) for i in range(5)]
         tall = [_fm(f"Height-Tall{i}", 1225) for i in range(5)]

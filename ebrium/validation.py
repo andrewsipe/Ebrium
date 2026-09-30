@@ -6,6 +6,7 @@ import argparse
 import FontCore.core_console_styles as cs
 from FontCore.core_console_styles import get_console
 
+from . import grouping
 from . import planning
 
 console = get_console()
@@ -84,7 +85,9 @@ def report_changes(families, plans, args, forced_groups) -> bool:
 
         family_label = f"[bold]{fam}[/bold]"
         unique_names = set(fm.family_name for fm in group)
-        if len(unique_names) > 1 and forced_groups and any(fam in fg for fg in forced_groups):
+        if forced_groups and any(
+            grouping.spec_covers_group(spec, fam) for spec in forced_groups
+        ):
             family_label += " [darktext.dim](matched)[/darktext.dim]"
 
         if any(fm.is_uniwidth for fm in group):

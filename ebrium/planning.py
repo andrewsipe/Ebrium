@@ -253,13 +253,26 @@ def family_cap_anchor(
     if len(ratios) < 2:
         return None
     tallest = max(ratios)
-    # A real core cluster is one linkage group. Compare the tallest cap in the
-    # family with that group's tallest, so a few percent of weight drift does
-    # not look like Short / Tall. Tallest against shortest is only for a family
-    # that never formed a core.
+    # A real core cluster is one linkage group. Weight drift inside that group
+    # is not a height change. A separate cluster sitting well below the tallest
+    # cap is, even when the core itself is the tall cut.
     if main_cluster and len(main_cluster) > 1:
+        core_ids = {id(fm) for fm in main_cluster}
         core = [ratio for fm in main_cluster if (ratio := cap_norm(fm)) is not None]
-        if not core or tallest - max(core) <= config.optical_threshold:
+        outside = [
+            ratio
+            for fm in fonts
+            if id(fm) not in core_ids
+            and not fm.is_unicase
+            and (ratio := cap_norm(fm)) is not None
+        ]
+        if not core:
+            return None
+        below = min(outside) if outside else tallest
+        if (
+            tallest - max(core) <= config.optical_threshold
+            and tallest - below <= config.optical_threshold
+        ):
             return None
     elif tallest - min(ratios) <= config.optical_threshold:
         return None

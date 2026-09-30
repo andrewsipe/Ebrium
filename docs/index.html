@@ -45,7 +45,8 @@ ebrium fonts/ -r -n</code></pre>
       <li><code>ebrium fonts/ -r -n</code> — one centered line box per family</li>
       <li><code>--no-cluster</code> — the same family, one box from the outline extremes so nothing clips</li>
       <li><code>--bbox-centered</code> — keep that family's span, and center each file on its bounding box</li>
-      <li><code>--match "Family A,Family B"</code> — one box for family names that do not already group</li>
+      <li><code>--match "Family A,Family B"</code> — one box for family names that do not share text</li>
+      <li><code>--match "Family Short"</code> — one box for files whose name contains that key</li>
       <li><code>ebrium probe</code> — read-only</li>
     </ul>
     <p>A run rewrites a variable font's default instance only and leaves <a href="https://learn.microsoft.com/en-us/typography/opentype/spec/mvar">MVAR</a> and <a href="https://learn.microsoft.com/en-us/typography/opentype/spec/hvar">HVAR</a> alone. <code>probe</code> reads that default instance and does not write.</p>

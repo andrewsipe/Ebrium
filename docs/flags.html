@@ -40,7 +40,9 @@
         <tr><td><code>--line-gap %</code></td><td>Extra space between lines (default 0). 5 is slightly looser.</td></tr>
         <tr><td><code>--no-cluster</code></td><td>One box from the family's outline extremes, so nothing clips.</td></tr>
         <tr><td><code>--bbox-centered</code></td><td>Keep the family's span. Center each file on its bounding box, so styles do not share a baseline.</td></tr>
-        <tr><td><code>--match "Family A,Family B"</code></td><td>Pair family names that do not already group, so they share one line box. A filename form matches the same name: FamilyShort is Family Short. Repeat the flag for another pair.</td></tr>
+        <tr><td><code>--match "Family A,Family B"</code></td><td>Join family names that do not share text. A filename form matches the spaced name: FamilyShort is Family Short.</td></tr>
+        <tr><td><code>--match "Family Short"</code></td><td>No comma: a key. Files whose family name or filename contains that phrase share one line box.</td></tr>
+        <tr><td><code>--match Text</code></td><td>A single word matches that word, including inside a compound, so Tall matches ExtraTall. The first --match keeps a file.</td></tr>
         <tr><td><code>ebrium probe fonts/ -r</code></td><td>Read the metrics. Write nothing.</td></tr>
       </tbody>
     </table>

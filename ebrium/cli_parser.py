@@ -134,8 +134,9 @@ def build_probe_parser() -> argparse.ArgumentParser:
         action="append",
         dest="combine",
         metavar="NAMES",
-        help='pair families whose names do not already group, so the report shows one group: '
-        '--match "Family A,Family B". Repeat for another pair',
+        help='a comma joins family names: --match "Family A,Family B". '
+        "Without a comma, files whose name contains the key share one group. "
+        "The first --match keeps a file.",
     )
     p.add_argument("--merge", action="append", dest="combine", help=argparse.SUPPRESS)
     g_out.add_argument(
@@ -177,14 +178,17 @@ def build_parser() -> argparse.ArgumentParser:
         "The plan is cap height, centered, at least 130% of the em. "
         "A deeper descender can lower the bottom. A tall accent stays in Win.",
         "A style whose outlines pass a sibling with the same cap keeps that sibling's box and may clip. "
-        "The family name is the group. --match is how two names share that box.",
+        "The family name is the group. --match is how files that do not already group share one box.",
         "--no-cluster skips that plan. The family shares one box set to its outline extremes, so nothing clips.",
         "--bbox-centered keeps that family span, then shifts each file so its "
         "bounding box sits in the middle. Cap height is no longer the center. "
         "Styles in the family will not share a baseline.",
-        '--match "Family A,Family B" pairs families whose names do not already group, so they share one line box. '
-        "A filename form matches the same name: FamilyShort is Family Short. "
-        "Repeat the flag for another pair. Each flag is its own pair.",
+        '--match "Family A,Family B" joins those family names. A comma is the only way to join names that do not share text. '
+        "Without a comma, the text is a key. A file joins when its family name or filename contains that key. "
+        'A phrase matches the phrase: "Family Short". A single word matches that word: Text. '
+        "A word inside a compound matches too, so Tall matches ExtraTall. "
+        "The first --match keeps a file. A later flag does not take it. "
+        "A filename form matches the spaced name: FamilyShort is Family Short.",
         "--span is the letter-span floor, as a percent of the em (default 130). "
         "0 keeps each file's current span. 120 is tighter, 150 is looser. "
         "A measured descender can still lower a span above 0.",
@@ -242,9 +246,10 @@ def build_parser() -> argparse.ArgumentParser:
         action="append",
         dest="combine",
         metavar="NAMES",
-        help='families in one flag share a line box, even when the names differ: '
-        '--match "Family A,Family B". Repeat for another pair. '
-        "Each flag is its own pair: -m A -m B does not match A with B",
+        help='a comma joins family names that do not share text: --match "Family A,Family B". '
+        "Without a comma, the text is a key matched in the family name or filename. "
+        'A phrase matches that phrase. A word matches that word, including inside a compound. '
+        "Repeat for another group. The first --match keeps a file.",
     )
     # Old spelling. Same destination, hidden from help.
     p.add_argument("--merge", action="append", dest="combine", help=argparse.SUPPRESS)

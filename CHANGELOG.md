@@ -23,6 +23,7 @@ The command groups by family name and writes one centered line box.
   already measured.
 - A family whose styles do not cluster still shares one line box, centered
   on the tallest cap. An ordinary weight spread inside one cluster does not.
+  A shorter height cluster still joins that box when the tall cut is the core.
   A font with no readable family name is grouped by its filename.
   `--use-ttx` reads and writes `.ttx` XML.
 - Cap height and x-height come from the outlines. `sCapHeight` and `sxHeight`
@@ -55,6 +56,8 @@ The command groups by family name and writes one centered line box.
   family's outline extremes so nothing clips. Formerly `--safe-max`.
 - `--match` pairs families whose names do not already group, so they
   share one line box. Formerly `--merge`. The old spelling still parses.
+  A comma joins names that do not share text. Without a comma, the text is
+  a key matched in the family name or filename. The first flag keeps a file.
 - `--bbox-centered` keeps the family's span and centers each file on its
   bounding box instead of the cap height. Styles do not share a baseline.
 
