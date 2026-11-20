@@ -1,6 +1,6 @@
 # ebrium
 
-**Version 4.0.0**
+**Version 4.0.1**
 
 Normalize vertical metrics across a font family — one line box, outlines unchanged — without changing `unitsPerEm`. Text stays inside the box. A layer or swash may clip.
 

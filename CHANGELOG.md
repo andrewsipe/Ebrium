@@ -1,5 +1,11 @@
 # Changelog
 
+## [4.0.1] - 2026-11-20
+
+### Fixed
+- Writing metrics changed `head.modified` on every font. Fonts, including those rebuilt from `.ttx`, are now opened with `recalcTimestamp=False`.
+- A regression test fails if a `TTFont()` open omits the flag.
+
 ## [4.0.0] - 2026-11-20
 
 The command groups by family name and writes one centered line box.

@@ -13,10 +13,10 @@ def _read_ttfont(path: str):
     from fontTools.ttLib import TTFont
 
     if str(path).lower().endswith(".ttx"):
-        font = TTFont()
+        font = TTFont(recalcTimestamp=False)
         font.importXML(path)
         return font
-    return TTFont(path)
+    return TTFont(path, recalcTimestamp=False)
 
 
 def _get_upm(font: TTFont) -> int:
