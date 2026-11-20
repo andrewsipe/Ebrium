@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## [4.0.0] - 2026-11-20
 
 The command groups by family name and writes one centered line box.
 `ebrium probe` reads metrics and does not write.
@@ -41,6 +41,11 @@ The command groups by family name and writes one centered line box.
   name, shares one line box centered on the tallest cap.
 - A script is an outline at least twice the em and heavier below the baseline.
   A face that only just crosses that line stays in the core.
+
+- Vendored FontCore refreshed to v0.2.0 (see `FontCore/VENDOR.md`). A filename
+  containing square brackets is no longer read as a console style tag. The copy
+  is now produced by FontCore's `tools/vendor_fontcore.py`, with the module list
+  under `[tool.fontcore-vendor]` in `pyproject.toml`.
 
 ### Removed
 - `springy`, and the grouping commands `individual`, `family`, and

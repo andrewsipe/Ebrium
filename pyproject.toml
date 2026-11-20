@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ebrium"
-version = "3.2.2"
+version = "4.0.0"
 description = "Normalize vertical metrics across font families (cap-height anchored)"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -35,3 +35,6 @@ packages = ["ebrium", "FontCore"]
 
 [tool.setuptools.package-data]
 ebrium = ["py.typed"]
+
+[tool.fontcore-vendor]
+modules = ["core_cli_help", "core_console_config", "core_console_styles", "core_file_collector", "core_font_sorter", "core_logging_config"]

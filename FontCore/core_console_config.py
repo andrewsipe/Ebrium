@@ -25,7 +25,7 @@ CONSOLE_CONFIG = {
     "pre_label_width": 5,  # width for pre-labels (smaller than regular labels)
     "pre_label_indent": 7,  # dedicated indent for non-status indenting
     "use_rich": True,  # set False to force non-rich fallback
-    "use_questionary": True,  # set False to force non-questionary fallback
+    "use_questionary": False,  # reserved; questionary is not a FontCore dependency
     "theme_mode": "dark",  # "dark" or "light"
 }
 

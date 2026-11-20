@@ -1,30 +1,27 @@
 # Vendored FontCore subset
 
-ebrium ships a minimal copy of FontCore so it installs without the full
-library or a git submodule.
+ebrium ships a minimal copy of [FontCore](https://github.com/andrewsipe/FontCore)
+so it installs without the full library, a submodule, or a symlink.
 
-## Included modules
+**Source:** FontCore 0.2.0 (`v0.2.0`)
 
-- `core_cli_help.py` — shared Rich `--help` building blocks (panel, footer sections)
-- `core_file_collector.py` — font path collection
-- `core_font_sorter.py` — family / superfamily grouping helpers
-- `core_console_styles.py` — console UX formatting
-- `core_console_config.py` — theme / labels / Rich setup
-- `core_logging_config.py` — logging helpers / Verbosity
+**Do not edit these files here.** Fix them in FontCore, then re-sync.
 
-## Refresh from monorepo FontCore
+## Declared modules
 
-From the Good Font Scripts monorepo root:
+- `core_cli_help.py`
+- `core_console_config.py`
+- `core_console_styles.py`
+- `core_file_collector.py`
+- `core_font_sorter.py`
+- `core_logging_config.py`
+
+## Refresh
+
+From a FontCore checkout:
 
 ```bash
-cp FontCore/core_cli_help.py \
-   FontCore/core_file_collector.py \
-   FontCore/core_font_sorter.py \
-   FontCore/core_console_styles.py \
-   FontCore/core_console_config.py \
-   FontCore/core_logging_config.py \
-   ebrium/FontCore/
+python tools/vendor_fontcore.py sync ../ebrium
 ```
 
-Re-copy when console, collector, sorter, or CLI help APIs change in a way ebrium relies on.
-This tree is owned by ebrium; it is not kept in live sync with FontCore.
+The module list lives in `[tool.fontcore-vendor]` in this project's `pyproject.toml`.
