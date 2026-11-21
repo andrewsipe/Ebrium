@@ -1,5 +1,10 @@
 # Changelog
 
+## [4.0.3] - 2026-11-21
+
+### Fixed
+- Vendored FontCore is stamped as 0.3.1 (the 0.3.0 copy was labeled 0.2.4 in `FontCore/VENDOR.md`). No change to what the tool does.
+
 ## [4.0.2] - 2026-11-21
 
 ### Changed
