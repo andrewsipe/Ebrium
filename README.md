@@ -12,14 +12,14 @@ Typical pipeline: naming cleanup ([FontNameID](https://github.com/andrewsipe/Fon
 
 ## Install
 
-Preferred: [pipx](https://pipx.pypa.io/) (isolated CLI, easy upgrades):
+Preferred: [uv](https://docs.astral.sh/uv/) (isolated CLI, easy upgrades):
 
 ```bash
-pipx install "git+https://github.com/andrewsipe/ebrium.git"
-# later: pipx upgrade ebrium
+uv tool install "git+https://github.com/andrewsipe/Ebrium.git"
+# later: uv tool upgrade ebrium
 ```
 
-Or from a clone: `pipx install .` / `pip install -e .`
+From a clone: `uv tool install --editable .` (edits take effect immediately).
 
 Requires Python 3.9+. Formats: TTF, OTF, WOFF, WOFF2 (`.ttx` with `--use-ttx`).
 
