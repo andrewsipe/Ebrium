@@ -317,18 +317,20 @@ def main() -> None:
         sys.exit(0)
 
     if args.dry_run:
-        process_all(measures, dry_run=True)
+        _u, _n, problems = process_all(measures, dry_run=True)
         cs.emit(
             f"{cs.INDENT}[darktext.dim]Total time: [bold]{time.time() - start_time:.1f}[/bold]s[/darktext.dim]",
             console=console,
         )
-        return
+        sys.exit(1 if problems else 0)
 
     if not args.yes:
         confirm_or_exit(len(measures))
 
-    process_all(measures, dry_run=False)
+    _u, _n, problems = process_all(measures, dry_run=False)
     cs.emit(
         f"{cs.INDENT}[darktext.dim]Total time: [bold]{time.time() - start_time:.1f}[/bold]s[/darktext.dim]",
         console=console,
     )
+    if problems:
+        sys.exit(1)

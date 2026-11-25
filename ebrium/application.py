@@ -343,11 +343,12 @@ def process_all(measures, dry_run=False):
             unchanged += 1
         cs.emit(msg, console=console)
 
-    cs.emit("")
-    cs.StatusIndicator("success", dry_run=dry_run).add_message(
-        "Processing Completed!"
-    ).with_summary_block(updated=updated, unchanged=unchanged, errors=errors).emit(
-        console
+    cs.fmt_processing_summary(
+        dry_run=dry_run,
+        updated=updated,
+        unchanged=unchanged,
+        errors=errors,
+        console=console,
     )
 
     return updated, unchanged, errors

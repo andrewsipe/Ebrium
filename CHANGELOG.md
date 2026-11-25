@@ -1,5 +1,13 @@
 # Changelog
 
+## [4.2.0] - 2026-11-25
+
+FontCore 0.8.2 vendored (see `FontCore/VENDOR.md`).
+
+### Changed
+- A run ends with one sentence ("Updated 3, unchanged 1, no problems.", or "Would update ..." in a preview), and the chip turns to a warning when a font could not be written. It replaces "Processing Completed!".
+- Ebrium exits 1 when any font could not be written (it exited 0).
+
 ## [4.1.0] - 2026-11-25
 
 FontCore 0.7.0 vendored (see `FontCore/VENDOR.md`).
