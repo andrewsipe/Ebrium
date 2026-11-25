@@ -44,10 +44,18 @@ validate_args = validation.validate_args
 
 
 def scan_fonts(paths: Iterable[str], recursive: bool, include_ttx: bool) -> list[str]:
-    files = collect_font_files(paths, recursive)
-    if include_ttx:
-        return files
-    return [f for f in files if Path(f).suffix.lower() != ".ttx"]
+    from FontCore.core_file_collector import BINARY_EXTENSIONS, SUPPORTED_EXTENSIONS
+
+    missing: list = []
+    files = collect_font_files(
+        paths,
+        recursive,
+        allowed_extensions=SUPPORTED_EXTENSIONS if include_ttx else BINARY_EXTENSIONS,
+        on_missing=missing.append,
+    )
+    for path in missing:
+        cs.StatusIndicator("warning").add_message(f"Path not found: {path}").emit(console)
+    return files
 
 
 def parse_args() -> argparse.Namespace:
