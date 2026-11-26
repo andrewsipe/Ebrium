@@ -112,20 +112,34 @@ def apply_metrics(fp: str, fm: FontMeasures, dry_run: bool) -> tuple[ApplyStatus
         typ_desc = _or_old(fm.target_typo_desc, old_vals.get("sTypoDescender", 0))
         line_gap = int(getattr(fm, "target_line_gap", 0) or 0)
 
+        # Variable fonts. The Win box must cover every axis pole, not only the default instance (the probe's
+        # question, answered at write time). A line box the design already varies (MVAR hasc/hdsc/hlgp) is the
+        # designer's: typo, hhea and the line gap are left as they are.
+        if not getattr(fm, "clip_moves", False):
+            if getattr(fm, "pole_max_y", None) is not None:
+                win_asc = max(win_asc, int(fm.pole_max_y))
+            if getattr(fm, "pole_min_y", None) is not None:
+                win_desc = max(win_desc, -int(fm.pole_min_y))
+        keep_line_box = bool(getattr(fm, "line_box_moves", False))
+        if keep_line_box:
+            typ_asc = old_vals.get("sTypoAscender", 0)
+            typ_desc = old_vals.get("sTypoDescender", 0)
+            line_gap = old_vals.get("sTypoLineGap", 0)
+
         new_vals = {
             "usWinAscent": win_asc,
             "usWinDescent": win_desc,
             "sTypoAscender": typ_asc,
             "sTypoDescender": typ_desc,
             "sTypoLineGap": line_gap,
-            "hhea.ascent": typ_asc,
-            "hhea.descent": typ_desc,
-            "hhea.lineGap": line_gap,
+            "hhea.ascent": old_vals.get("hhea.ascent", typ_asc) if keep_line_box else typ_asc,
+            "hhea.descent": old_vals.get("hhea.descent", typ_desc) if keep_line_box else typ_desc,
+            "hhea.lineGap": old_vals.get("hhea.lineGap", line_gap) if keep_line_box else line_gap,
         }
         new_vals.update(measured_os2_heights(fm, os2))
         # USE_TYPO_METRICS is part of the plan. Count it even when the
         # ascender, descender, and line gap are already in place.
-        if os2 and getattr(os2, "version", 0) >= 4:
+        if os2 and getattr(os2, "version", 0) >= 4 and not keep_line_box:
             new_vals["fsSelection"] = int(old_vals.get("fsSelection", 0)) | (1 << 7)
 
         # Determine changes
@@ -224,9 +238,9 @@ def apply_metrics(fp: str, fm: FontMeasures, dry_run: bool) -> tuple[ApplyStatus
             if "fsSelection" in new_vals:
                 os2.fsSelection = new_vals["fsSelection"]
         if hhea:
-            hhea.ascent = int(typ_asc)
-            hhea.descent = int(typ_desc)
-            hhea.lineGap = line_gap
+            hhea.ascent = int(new_vals["hhea.ascent"])
+            hhea.descent = int(new_vals["hhea.descent"])
+            hhea.lineGap = int(new_vals["hhea.lineGap"])
 
         font.flavor = orig_flavor
         # Write through a symlink to the real file, and replace that file only

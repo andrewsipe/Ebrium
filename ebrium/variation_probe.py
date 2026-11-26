@@ -164,6 +164,28 @@ def instance_y_bounds(
     return min_y, max_y
 
 
+def pole_ink_range(font: TTFont) -> Optional[tuple[int, int]]:
+    """Cmap ink (yMin, yMax) across every axis pole, default excluded; None when nothing could be sampled."""
+    lows: list[int] = []
+    highs: list[int] = []
+    for _label, loc in axis_pole_user_locations(font)[1:]:
+        bounds = instance_y_bounds(font, loc)
+        if bounds is not None:
+            lows.append(bounds[0])
+            highs.append(bounds[1])
+    if not lows:
+        return None
+    return min(lows), max(highs)
+
+
+def design_moves(font: TTFont, tags: Sequence[str]) -> bool:
+    """True when MVAR already varies any of ``tags`` across the poles (the designer's own adjustment)."""
+    if "MVAR" not in font:
+        return False
+    ranges, _unknown = mvar_aggregate_ranges(font, axis_pole_user_locations(font))
+    return bool(_moving(ranges, tags))
+
+
 @dataclass
 class PoleOverflow:
     label: str

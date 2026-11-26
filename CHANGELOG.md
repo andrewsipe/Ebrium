@@ -1,5 +1,11 @@
 # Changelog
 
+## [4.3.0] - 2026-11-26
+
+### Fixed
+- A variable font's Win box now covers every axis pole, not only the default instance. The write used to set `usWinAscent` and `usWinDescent` from the default outlines, which added clipping at an axis extreme to about a quarter of the variable fonts in a trial run (18 of 68 newly clipped, on top of 10 that already clipped). `ebrium probe` finds none after the write.
+- A line box the design already varies (MVAR `hasc`, `hdsc` or `hlgp`) is left alone: typo, hhea and the line gap are not rewritten for that font. If the design already varies the clipping box (`hcla`, `hcld`), the Win box is not touched either.
+
 ## [4.2.0] - 2026-11-25
 
 FontCore 0.8.2 vendored (see `FontCore/VENDOR.md`).

@@ -43,6 +43,13 @@ class FontMeasures:
         # Layer or swash companion. It keeps the family's line box and may clip.
         self.clip_with_family: bool = False
 
+        # Variable fonts: cmap ink across the axis poles (default excluded), and whether the design already varies
+        # the line box (MVAR hasc/hdsc/hlgp) or the clipping box (hcla/hcld). None / False for a static font.
+        self.pole_min_y: Optional[int] = None
+        self.pole_max_y: Optional[int] = None
+        self.line_box_moves: bool = False
+        self.clip_moves: bool = False
+
         # Computed targets
         self.target_typo_asc: Optional[int] = None
         self.target_typo_desc: Optional[int] = None

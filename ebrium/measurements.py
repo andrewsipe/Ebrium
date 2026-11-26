@@ -450,6 +450,25 @@ def measure_fonts(
                         fm.min_y = int(round(overall[0]))
                         fm.max_y = int(round(overall[1]))
 
+                    if "fvar" in font:
+                        # A variable font is measured at its default, but the Win box must cover every axis pole, and a
+                        # line box the design already varies is the designer's.
+                        try:
+                            from .variation_probe import (
+                                CLIP_TAGS,
+                                LINE_BOX_TAGS,
+                                design_moves,
+                                pole_ink_range,
+                            )
+
+                            poles = pole_ink_range(font)
+                            if poles is not None:
+                                fm.pole_min_y, fm.pole_max_y = poles
+                            fm.line_box_moves = design_moves(font, LINE_BOX_TAGS)
+                            fm.clip_moves = design_moves(font, CLIP_TAGS)
+                        except Exception:
+                            pass
+
                     fm.cap_height = _cap_height(font)
                     fm.cap_optical = _cap_height_optical(font)
                     fm.ascender_max = _ascender_max(font)
